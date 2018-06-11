@@ -31,27 +31,6 @@ demoData <- read.csv("Demographic data.csv", stringsAsFactors = F)
 # No of months in current company:	No of months in current company of customers
 # Performance Tag:	Status of customer performance (1 represents "Default")
 
-### Credit Card Data ###
-# Application ID:	Customer application ID
-# No of times 90 DPD or worse in last 6 months:	Number of times customer has not payed dues since 90days in last 6 months
-# No of times 60 DPD or worse in last 6 months:	Number of times customer has not payed dues since 60 days last 6 months
-# No of times 30 DPD or worse in last 6 months:	Number of times customer has not payed dues since 30 days days last 6 months
-# No of times 90 DPD or worse in last 12 months:	Number of times customer has not payed dues since 90 days days last 12 months
-# No of times 60 DPD or worse in last 12 months:	Number of times customer has not payed dues since 60 days days last 12 months
-# No of times 30 DPD or worse in last 12 months:	Number of times customer has not payed dues since 30 days days last 12 months
-# Avgas CC Utilization in last 12 months:	Average utilization of credit card by customer
-# No of trades opened in last 6 months:	Number of times the customer has done the trades in last 6 months
-# No of trades opened in last 12 months:	Number of times the customer has done the trades in last 12 months
-# No of PL trades opened in last 6 months:	No of PL trades in last 6 month of customer
-# No of PL trades opened in last 12 months:	No of PL trades in last 12 month of customer
-# No of Inquiries in last 6 months (excluding home & auto loans):	Number of times the customers has inquired in last 6 months
-# No of Inquiries in last 12 months (excluding home & auto loans):	Number of times the customers has inquired in last 12 months
-# Presence of open home loan:	Is the customer has home loan (1 represents "Yes")
-# Outstanding Balance:	Outstanding balance of customer
-# Total No of Trades:	Number of times the customer has done total trades
-# Presence of open auto loan:	Is the customer has auto loan (1 represents "Yes")
-# Performance Tag:	Status of customer performance (1 represents "Default")
-                                                 
 ########## Data Quality Issues ###########
 "There are 3 duplicates for Application ID, both in credit and Demographic data (same IDs).
 There are 1425 istances, where Performance Tag is not available, so, shall we remove them.
@@ -60,19 +39,7 @@ Missing Value Imputation Strategy (While not using woe values)
 ##########################################
 
 
-######################### Basic Data Quality Checks and Understanding ####################################
-head(creditBureauData)
-str(creditBureauData)
-dim(creditBureauData) # 71295*19
-sum(is.na(creditBureauData)) ## 3028 nulls in total
-colSums(is.na(select_if(creditBureauData, colSums(is.na(creditBureauData))>0))) ## Column having nulls
-## The predictor Variable PerformanceTag has nulls, removing the records (~2%)
-creditBureauData <- creditBureauData[is.na(creditBureauData$Performance.Tag)==F,]
-sum(sapply(creditBureauData, function(x)
-  length(which(x == "")))) # checking for blank "" values; there are none
-sum(duplicated(creditBureauData$Application.ID)) ## 3 duplicates
-
-
+################### Basic Data Quality Checks and Understanding (For Demographic Data) #############################
 head(demoData)
 str(demoData)
 dim(demoData) # 71295*12
@@ -186,7 +153,7 @@ names(woe_data)
 
 #### Imputing with normal Methodologies #########
 colSums(is.na(select_if(demoData, colSums(is.na(demoData))>0)))
-getmode <- function(v) {
+getmode <- function(v) { ## Function to calculate Mode
   uniqv <- unique(v)
   uniqv[which.max(tabulate(match(v, uniqv)))]
 }
@@ -238,8 +205,6 @@ demoData[(which(demoData$currJobTenure > 74)), ]$currJobTenure <- 74
 
 ### Deriving new variables/Attributes ###
 head(demoData)
-sapply(select_if(combi, is.numeric), function(x)
-  quantile(x, seq(0, 1, 0.01))) ## Function to understand the outliers
 
 ## Visualisation to help binning out continuous Variables
 p1 <- ggplot(demoData %>% group_by(Age, PerformanceTag) %>% summarise(Count_By_PerformanceTag = n())) + geom_point(aes(x=Age, y=Count_By_PerformanceTag, color = PerformanceTag))
@@ -267,6 +232,7 @@ demoData$iscurrResidenceTenurelessthan8 <- ifelse(demoData$currResidenceTenure<8
 demoData$iscurrJobTenurelessthan4 <- ifelse(demoData$currJobTenure<4, 1, 0)
 
 ## COnverting columns into required datatypes
+ApplicationIDdemo <- demoData[,1]           ## Storing Application ID from Demographic Data
 demoData <- demoData[,-1] ## Application_ID will not be required
 demoData$Gender <- as.factor(demoData$Gender)
 demoData$MaritalStatus <- as.factor(demoData$MaritalStatus)
@@ -275,6 +241,8 @@ demoData$Profession <- as.factor(demoData$Profession)
 demoData$PerformanceTag <- as.factor(demoData$PerformanceTag)
 demoData$TypeofResidence <- as.factor(demoData$TypeofResidence)
 demoData$Dependents <- as.numeric(demoData$Dependents)
+
+demoDataCleaned <- demoData ## Shall be used along with Credit Card Bureau Data for final model evaluation 
 
 ### Since, no. of categories in different categorical attributes is not high enough, hence, not
 ## Binnning up the categorical attributes
@@ -305,3 +273,187 @@ demoData = cbind(demoData, demoData_numeric_norm)
 ## Looking into the correlation amongst the variables
 cor_matrix = cor(demoData[,-c("PerformanceTag.1")])
 corrplot(cor_matrix, method = "pie", type = "lower", tl.cex = 0.9)
+
+##########################3####3 Data Understanding (For Credit Data) ###################################3
+### Credit Card Data ###
+# Application ID:	Customer application ID
+# No of times 90 DPD or worse in last 6 months:	Number of times customer has not payed dues since 90days in last 6 months
+# No of times 60 DPD or worse in last 6 months:	Number of times customer has not payed dues since 60 days last 6 months
+# No of times 30 DPD or worse in last 6 months:	Number of times customer has not payed dues since 30 days days last 6 months
+# No of times 90 DPD or worse in last 12 months:	Number of times customer has not payed dues since 90 days days last 12 months
+# No of times 60 DPD or worse in last 12 months:	Number of times customer has not payed dues since 60 days days last 12 months
+# No of times 30 DPD or worse in last 12 months:	Number of times customer has not payed dues since 30 days days last 12 months
+# Avgas CC Utilization in last 12 months:	Average utilization of credit card by customer
+# No of trades opened in last 6 months:	Number of times the customer has done the trades in last 6 months
+# No of trades opened in last 12 months:	Number of times the customer has done the trades in last 12 months
+# No of PL trades opened in last 6 months:	No of PL trades in last 6 month of customer
+# No of PL trades opened in last 12 months:	No of PL trades in last 12 month of customer
+# No of Inquiries in last 6 months (excluding home & auto loans):	Number of times the customers has inquired in last 6 months
+# No of Inquiries in last 12 months (excluding home & auto loans):	Number of times the customers has inquired in last 12 months
+# Presence of open home loan:	Is the customer has home loan (1 represents "Yes")
+# Outstanding Balance:	Outstanding balance of customer
+# Total No of Trades:	Number of times the customer has done total trades
+# Presence of open auto loan:	Is the customer has auto loan (1 represents "Yes")
+# Performance Tag:	Status of customer performance (1 represents "Default")
+
+######################### Basic Data Quality Checks and Understanding (For Credit Data) ####################################
+head(creditBureauData)
+str(creditBureauData)
+dim(creditBureauData) # 71295*19
+sum(is.na(creditBureauData)) ## 3028 nulls in total
+colSums(is.na(select_if(creditBureauData, colSums(is.na(creditBureauData))>0))) ## Column having nulls
+## The predictor Variable PerformanceTag has nulls, removing the records (~2%)
+creditBureauData <- creditBureauData[is.na(creditBureauData$Performance.Tag)==F,]
+sum(sapply(creditBureauData, function(x)
+  length(which(x == "")))) # checking for blank "" values; there are none
+sum(duplicated(creditBureauData$Application.ID)) ## 3 duplicates
+creditBureauData <- creditBureauData[is.na(creditBureauData$Performance.Tag)==F,] ## Removing the recprds where target Variable is absent
+
+### Quality Issues in the Credit data ###
+"Check, if the Performance.Tag is same in both the data sets, corresponding to the same Application ID"
+
+######### Exploratory Data Analysis (For Credit Card Bureau Data) ###########
+creditBureauData$Performance.Tag <- as.factor(creditBureauData$Performance.Tag)
+## Univariate Analysis
+p1 <- ggplot(creditBureauData %>% group_by(Performance.Tag) %>% summarise(Count = n()) %>% mutate(freq = format((Count * 100) / sum(Count)))) +  
+  geom_bar(aes(Performance.Tag, Count), stat = "identity", fill = "blue2") +
+  geom_label(aes(Performance.Tag, Count, label = freq), vjust = 0.5) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+p2 <- ggplot(creditBureauData %>% group_by(No.of.times.90.DPD.or.worse.in.last.6.months, Performance.Tag) %>% summarise(Count = n()) %>% mutate(freq = format((Count * 100) / sum(Count)))) + 
+  geom_bar(aes(No.of.times.90.DPD.or.worse.in.last.6.months, Count), stat = "identity", fill = "blue2") +
+  geom_label(aes(No.of.times.90.DPD.or.worse.in.last.6.months, Count, label = freq), vjust = 0.5) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+p3 <- ggplot(creditBureauData %>% group_by(No.of.times.60.DPD.or.worse.in.last.6.months, Performance.Tag) %>% summarise(Count = n()) %>% mutate(freq = format((Count * 100) / sum(Count)))) + 
+  geom_bar(aes(No.of.times.60.DPD.or.worse.in.last.6.months, Count), stat = "identity", fill = "blue2") +
+  geom_label(aes(No.of.times.60.DPD.or.worse.in.last.6.months, Count, label = freq), vjust = 0.5) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+p4 <- ggplot(creditBureauData %>% group_by(No.of.times.30.DPD.or.worse.in.last.6.months, Performance.Tag) %>% summarise(Count = n()) %>% mutate(freq = format((Count * 100) / sum(Count)))) + 
+  geom_bar(aes(No.of.times.30.DPD.or.worse.in.last.6.months, Count), stat = "identity", fill = "blue2") +
+  geom_label(aes(No.of.times.30.DPD.or.worse.in.last.6.months, Count, label = freq), vjust = 0.5) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+p5 <- ggplot(creditBureauData %>% group_by(No.of.times.90.DPD.or.worse.in.last.12.months, Performance.Tag) %>% summarise(Count = n()) %>% mutate(freq = format((Count * 100) / sum(Count)))) +  
+  geom_bar(aes(No.of.times.90.DPD.or.worse.in.last.12.months, Count), stat = "identity", fill = "blue2") +
+  geom_label(aes(No.of.times.90.DPD.or.worse.in.last.12.months, Count, label = freq), vjust = 0.5) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+p6 <- ggplot(creditBureauData %>% group_by(No.of.times.60.DPD.or.worse.in.last.12.months, Performance.Tag) %>% summarise(Count = n()) %>% mutate(freq = format((Count * 100) / sum(Count)))) + 
+  geom_bar(aes(No.of.times.60.DPD.or.worse.in.last.12.months, Count), stat = "identity", fill = "blue2") +
+  geom_label(aes(No.of.times.60.DPD.or.worse.in.last.12.months, Count, label = freq), vjust = 0.5) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+p7 <- ggplot(creditBureauData %>% group_by(No.of.times.30.DPD.or.worse.in.last.12.months, Performance.Tag) %>% summarise(Count = n()) %>% mutate(freq = format((Count * 100) / sum(Count)))) +  
+  geom_bar(aes(No.of.times.30.DPD.or.worse.in.last.12.months, Count), stat = "identity", fill = "blue2") +
+  geom_label(aes(No.of.times.30.DPD.or.worse.in.last.12.months, Count, label = freq), vjust = 0.5) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+p8 <- ggplot(creditBureauData %>% group_by(No.of.trades.opened.in.last.6.months, Performance.Tag) %>% summarise(Count = n()) %>% mutate(freq = format((Count * 100) / sum(Count)))) + 
+  geom_bar(aes(No.of.trades.opened.in.last.6.months, Count), stat = "identity", fill = "blue2") +
+  geom_label(aes(No.of.trades.opened.in.last.6.months, Count, label = freq), vjust = 0.5) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+plot_grid(p1,p2,p3,p4)
+plot_grid(p5,p6,p7,p8)
+
+p1 <- ggplot(creditBureauData, aes(x=Performance.Tag, y=No.of.trades.opened.in.last.12.months)) + geom_violin(trim=FALSE, fill='#A4A4A4', color="darkred") + geom_boxplot(width=0.1)
+p2 <- ggplot(creditBureauData, aes(x=Performance.Tag, y=No.of.PL.trades.opened.in.last.6.months)) + geom_violin(trim=FALSE, fill='#A4A4A4', color="darkred") + geom_boxplot(width=0.1)
+p3 <- ggplot(creditBureauData, aes(x=Performance.Tag, y=No.of.PL.trades.opened.in.last.12.months)) + geom_violin(trim=FALSE, fill='#A4A4A4', color="darkred") + geom_boxplot(width=0.1)
+p4 <- ggplot(creditBureauData, aes(x=Performance.Tag, y=No.of.Inquiries.in.last.6.months..excluding.home...auto.loans.)) + geom_violin(trim=FALSE, fill='#A4A4A4', color="darkred") + geom_boxplot(width=0.1)
+p5 <- ggplot(creditBureauData, aes(x=Performance.Tag, y=No.of.Inquiries.in.last.12.months..excluding.home...auto.loans.)) + geom_violin(trim=FALSE, fill='#A4A4A4', color="darkred") + geom_boxplot(width=0.1)
+
+p6 <- ggplot(creditBureauData %>% group_by(Presence.of.open.home.loan, Performance.Tag) %>% summarise(Count = n()) %>% mutate(freq = format((Count * 100) / sum(Count)))) + 
+  geom_bar(aes(Presence.of.open.home.loan, Count), stat = "identity", fill = "blue2") +
+  geom_label(aes(Presence.of.open.home.loan, Count, label = freq), vjust = 0.5) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+p7 <- ggplot(creditBureauData, aes(x=Performance.Tag, y=Total.No.of.Trades)) + geom_violin(trim=FALSE, fill='#A4A4A4', color="darkred") + geom_boxplot(width=0.1)
+
+p8 <- ggplot(creditBureauData %>% group_by(Presence.of.open.auto.loan, Performance.Tag) %>% summarise(Count = n()) %>% mutate(freq = format((Count * 100) / sum(Count)))) + 
+  geom_bar(aes(Presence.of.open.auto.loan, Count), stat = "identity", fill = "blue2") +
+  geom_label(aes(Presence.of.open.auto.loan, Count, label = freq), vjust = 0.5) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+p9 <- ggplot(creditBureauData, aes(x=Performance.Tag, y=Avgas.CC.Utilization.in.last.12.months)) + geom_violin(trim=FALSE, fill='#A4A4A4', color="darkred") + geom_boxplot(width=0.1)
+p10 <- ggplot(creditBureauData, aes(x=Performance.Tag, y=Outstanding.Balance)) + geom_violin(trim=FALSE, fill='#A4A4A4', color="darkred") + geom_boxplot(width=0.1)
+
+
+plot_grid(p2,p3,p4,p5)
+plot_grid(p6,p8)
+plot_grid(p1,p7,p9,p10)
+
+## Checking for the normallity of the Continuous Variables
+p1 <- ggplot(creditBureauData, aes(x=Avgas.CC.Utilization.in.last.12.months)) + geom_histogram(aes(y=..density..),  binwidth=.5,
+                                                    colour="black", fill="white") +  geom_density(alpha=.2, fill="#FF6666") +
+  geom_vline(aes(xintercept=mean(Avgas.CC.Utilization.in.last.12.months, na.rm=T)), color="red", linetype="dashed", size=1)
+
+p2 <- ggplot(creditBureauData, aes(x=(Outstanding.Balance/10000))) + geom_histogram(aes(y=..density..),  binwidth=.5,
+                                                       colour="black", fill="white") +  geom_density(alpha=.2, fill="#FF6666") +
+  geom_vline(aes(xintercept=mean(Outstanding.Balance, na.rm=T)/10000), color="red", linetype="dashed", size=1)
+
+plot_grid(p1,p2)
+### Imputation using normal Methodologies (Mean, Median, Mode)###
+sapply(creditBureauData[, colnames(creditBureauData) %in% c("Avgas.CC.Utilization.in.last.12.months","No.of.trades.opened.in.last.6.months",
+                                                            "Presence.of.open.home.loan")], function(x) unique(x))
+
+## Changing the column names, replacing the '.' with '_'
+colnames(creditBureauData) <- gsub("\\.","_",names(creditBureauData))
+colSums(is.na(select_if(creditBureauData, colSums(is.na(creditBureauData))>0))) ## Column having nulls
+creditBureauData <- as.data.table(creditBureauData)
+creditBureauData[is.na(creditBureauData$Avgas_CC_Utilization_in_last_12_months)==TRUE]$Avgas_CC_Utilization_in_last_12_months <- getmode(creditBureauData$Avgas_CC_Utilization_in_last_12_months)
+creditBureauData[is.na(creditBureauData$No_of_trades_opened_in_last_6_months)==TRUE]$No_of_trades_opened_in_last_6_months <- getmode(creditBureauData$No_of_trades_opened_in_last_6_months)
+creditBureauData[is.na(creditBureauData$Presence_of_open_home_loan)==TRUE]$Presence_of_open_home_loan <- getmode(creditBureauData$Presence_of_open_home_loan)
+creditBureauData[is.na(creditBureauData$Outstanding_Balance)==TRUE]$Outstanding_Balance <- as.integer(median(creditBureauData$Outstanding_Balance, na.rm = TRUE))
+sum(is.na(creditBureauData)) ## All missing Values imputed
+
+## ## Checking for the Outliers
+sapply(creditBureauData, function(x) length(unique(x)))
+ApplicationIDcredit <- creditBureauData[,1] ## Storing Application ID from Credit Bureau Data
+creditBureauData <- creditBureauData[,-1] ## Removing Application_ID
+summary(creditBureauData)
+sapply(creditBureauData[,-18], function(x) quantile(x, seq(0, 1, 0.01)))
+creditBureauData[(which(creditBureauData$Total_No_of_Trades > 44)), ]$Total_No_of_Trades <- 44
+creditBureauData[(which(creditBureauData$Outstanding_Balance < 1251.07)), ]$Outstanding_Balance <- 1251
+creditBureauData[(which(creditBureauData$No_of_Inquiries_in_last_12_months__excluding_home___auto_loans_ > 15)), ]$No_of_Inquiries_in_last_12_months__excluding_home___auto_loans_ <- 20
+creditBureauData[(which(creditBureauData$No_of_trades_opened_in_last_12_months > 21)), ]$No_of_trades_opened_in_last_12_months <- 21
+
+## Binning up of Continuous Variables and Feature Engineering
+sapply(creditBureauData[,15], function(x) quantile(x, seq(0, 1, 0.25)))
+creditBureauData$Outstanding_Balance_Quartile <- as.factor(cut(creditBureauData$Outstanding_Balance, breaks = c(1250, 209061, 774234, 2924615, 5218802)))
+
+## One Hot Encoding
+ohe = dummyVars("~.", data = creditBureauData[,c("Outstanding_Balance_Quartile", "Performance_Tag")], fullRank = T)
+ohe_df = data.table(predict(ohe, creditBureauData[,c("Outstanding_Balance_Quartile", "Performance_Tag")]))
+creditBureauData = cbind(creditBureauData[,-c("Outstanding_Balance_Quartile", "Performance_Tag")], ohe_df)
+creditBureauData <- as.data.table(sapply( creditBureauData, as.numeric ))
+
+## Scaling numeric predictors
+num_vars = which(sapply(creditBureauData, is.numeric)) # index of numeric features
+num_vars_names = names(num_vars)
+creditBureauData_numeric = creditBureauData[,setdiff(num_vars_names, "Performance_Tag.1"), with = F]
+prep_num = preProcess(creditBureauData_numeric, method=c("center", "scale"))
+creditBureauData_numeric_norm = predict(prep_num, creditBureauData_numeric)
+creditBureauData[,setdiff(num_vars_names, "Performance_Tag.1") := NULL] # removing numeric independent variables
+creditBureauData = cbind(creditBureauData, creditBureauData_numeric_norm)
+
+## Looking into the correlation amongst the variables
+cor_matrix = cor(creditBureauData[,-c("Performance_Tag.1")])
+corrplot(cor_matrix, method = "pie", type = "lower", tl.cex = 0.9)
+## From the plot, we can see that, there exists a strong correlation amongst the variables
+
+############################# Preparing for the final Data ##########################
+### Initial Checks ###
+dim(ApplicationIDcredit); dim(ApplicationIDdemo)
+nrow(demoData); nrow(creditBureauData)
+
+### Joining the datasets to prepare the final DataSet for final Modelling
+finalData <- as.data.table(cbind(ApplicationIDcredit,demoData,creditBureauData))
+str(finalData)
+
+## Checking the Values in the target Attribute
+setdiff(finalData$Performance_Tag.1, finalData$PerformanceTag.1) ## No Difference :)
+finalData <- finalData[,-c("Performance_Tag.1","Application_ID")]
+cor_matrix = cor(finalData[,-c("PerformanceTag.1")])
+corrplot(cor_matrix, method = "pie", type = "lower", tl.cex = 0.9) ## Correlation in the Final Data Set
