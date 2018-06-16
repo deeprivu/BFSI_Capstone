@@ -35,6 +35,8 @@ demoData <- read.csv("Demographic data.csv", stringsAsFactors = F)
 "There are 3 duplicates for Application ID, both in credit and Demographic data (same IDs).
 There are 1425 istances, where Performance Tag is not available, so, shall we remove them.
 Missing Value Imputation Strategy (While not using woe values)
+
+Correlation Matrix and Plots need to be changed, its clumpsy now 
 "
 ##########################################
 
@@ -146,7 +148,7 @@ p3 <- ggplot(demoData, aes(x=PerformanceTag, y=currResidenceTenure)) + geom_viol
 p4 <- ggplot(demoData, aes(x=PerformanceTag, y=currJobTenure)) + geom_violin(trim=FALSE, fill='#A4A4A4', color="darkred") + geom_boxplot(width=0.1)
 
 plot_grid(p1,p2,p3,p4)
-
+demoData_woe <- demoData
 ############################ Treating Data Quality Issues #############################
 woe_data <- demoData
 names(woe_data)
@@ -177,19 +179,20 @@ woe_data$Profession <- as.factor(woe_data$Profession)
 woe_data$PerformanceTag <- as.factor(woe_data$PerformanceTag)
 woe_data$TypeofResidence <- as.factor(woe_data$TypeofResidence)
 
-woe_data$Age <- as.numeric(woe_data$Age)
-woe_data$Dependents <- as.numeric(woe_data$Dependents)
-woe_data$Income <- as.numeric(woe_data$Income)
-woe_data$currResidenceTenure <- as.numeric(woe_data$currResidenceTenure)
-woe_data$currJobTenure <- as.numeric(woe_data$currJobTenure)
+woe_data$Age <- as.integer(woe_data$Age)
+woe_data$Dependents <- as.integer(woe_data$Dependents)
+woe_data$Income <- as.integer(woe_data$Income)
+woe_data$currResidenceTenure <- as.integer(woe_data$currResidenceTenure)
+woe_data$currJobTenure <- as.integer(woe_data$currJobTenure)
 
-# woe_data <- as.data.frame(woe_data)
-# row.names(woe_data) <- 1:nrow(woe_data) 
-# woe_test <- iv.replace.woe(woe_data,iv=iv.mult(woe_data,"PerformanceTag")) ## Imputing with woe values
-# 
-# iv.mult(woe_data,"PerformanceTag")
-# colSums(is.na(woe_test))
-# colSums(is.na(demoData))
+ woe_data <- as.data.frame(woe_data)
+ row.names(woe_data) <- 1:nrow(woe_data)
+ outiv <- iv.mult(woe_data,"PerformanceTag")
+ woe_test <- iv.replace.woe(woe_data, outiv) ## Imputing with woe values
+
+ iv.mult(woe_data,"PerformanceTag")
+ colSums(is.na(woe_test))
+ colSums(is.na(demoData))
 
 ### After imputation, we have 2 datasets: demoData <- Imputation with normal methodologies
 ### woe_data <- Imputation with woe_values
@@ -394,6 +397,7 @@ p2 <- ggplot(creditBureauData, aes(x=(Outstanding.Balance/10000))) + geom_histog
   geom_vline(aes(xintercept=mean(Outstanding.Balance, na.rm=T)/10000), color="red", linetype="dashed", size=1)
 
 plot_grid(p1,p2)
+creditBureauData_woe <- creditBureauData
 ### Imputation using normal Methodologies (Mean, Median, Mode)###
 sapply(creditBureauData[, colnames(creditBureauData) %in% c("Avgas.CC.Utilization.in.last.12.months","No.of.trades.opened.in.last.6.months",
                                                             "Presence.of.open.home.loan")], function(x) unique(x))
@@ -418,6 +422,7 @@ creditBureauData[(which(creditBureauData$Total_No_of_Trades > 44)), ]$Total_No_o
 creditBureauData[(which(creditBureauData$Outstanding_Balance < 1251.07)), ]$Outstanding_Balance <- 1251
 creditBureauData[(which(creditBureauData$No_of_Inquiries_in_last_12_months__excluding_home___auto_loans_ > 15)), ]$No_of_Inquiries_in_last_12_months__excluding_home___auto_loans_ <- 20
 creditBureauData[(which(creditBureauData$No_of_trades_opened_in_last_12_months > 21)), ]$No_of_trades_opened_in_last_12_months <- 21
+
 
 ## Binning up of Continuous Variables and Feature Engineering
 sapply(creditBureauData[,15], function(x) quantile(x, seq(0, 1, 0.25)))
@@ -457,3 +462,1187 @@ setdiff(finalData$Performance_Tag.1, finalData$PerformanceTag.1) ## No Differenc
 finalData <- finalData[,-c("Performance_Tag.1","Application_ID")]
 cor_matrix = cor(finalData[,-c("PerformanceTag.1")])
 corrplot(cor_matrix, method = "pie", type = "lower", tl.cex = 0.9) ## Correlation in the Final Data Set
+
+
+############################### Model Building Phase for Demo Data (using Logistic Regression) ########################
+# separate training and testing data
+set.seed(100)
+trainindices= sample(1:nrow(demoData), 0.7*nrow(demoData))
+train = demoData[trainindices,]
+test = demoData[-trainindices,]
+
+## Logistic Regression ##
+## Initial Model using all the variables of Demo_Data ##
+model_1 <-glm(PerformanceTag.1~.,data=train)
+summary(model_1)
+
+## Running stepAID
+step <- stepAIC(model_1, direction="both")
+summary(step)
+
+## Fine tuning model 
+model_2 <- glm(formula = PerformanceTag.1 ~ Income + currResidenceTenure + 
+                 currJobTenure + iscurrResidenceTenurelessthan8 + iscurrJobTenurelessthan4 + 
+                 Profession.SE + `Age_bucket_Quartile.(37,45]` + `Income_bucket_Quartile.(40,61]` + 
+                 `currResidenceTenure_bucket_Quartile.(10,61]` + `currResidenceTenure_bucket_Quartile.(61,123]` + 
+                 `currJobTenure_bucket_Quartile.(17,34]` + `currJobTenure_bucket_Response.(60,74]`, 
+               data = train)
+summary(model_2)
+vif(model_2)
+
+model_3 <- glm(formula = PerformanceTag.1 ~ Income + currResidenceTenure + 
+                 currJobTenure + iscurrResidenceTenurelessthan8 + iscurrJobTenurelessthan4 + 
+                 Profession.SE + `Age_bucket_Quartile.(37,45]` + `Income_bucket_Quartile.(40,61]` + 
+                 `currResidenceTenure_bucket_Quartile.(10,61]` + `currJobTenure_bucket_Quartile.(17,34]` + `currJobTenure_bucket_Response.(60,74]`, 
+               data = train)
+summary(model_3)
+vif(model_3)
+
+model_4 <- glm(formula = PerformanceTag.1 ~ Income + currResidenceTenure + 
+                 currJobTenure + iscurrResidenceTenurelessthan8 + iscurrJobTenurelessthan4 + 
+                 Profession.SE + `Age_bucket_Quartile.(37,45]` +  
+                 `currResidenceTenure_bucket_Quartile.(10,61]` + `currJobTenure_bucket_Quartile.(17,34]` + `currJobTenure_bucket_Response.(60,74]`, 
+               data = train)
+summary(model_4)
+vif(model_4)
+
+model_5 <- glm(formula = PerformanceTag.1 ~ Income + currResidenceTenure + 
+                 currJobTenure + iscurrResidenceTenurelessthan8 + iscurrJobTenurelessthan4 + 
+                 Profession.SE + `Age_bucket_Quartile.(37,45]` + `currJobTenure_bucket_Quartile.(17,34]` + `currJobTenure_bucket_Response.(60,74]`, 
+               data = train)
+summary(model_5)
+vif(model_5)
+
+model_6 <- glm(formula = PerformanceTag.1 ~ Income + currResidenceTenure + 
+                 currJobTenure + iscurrResidenceTenurelessthan8 + iscurrJobTenurelessthan4 + 
+                 Profession.SE + `currJobTenure_bucket_Quartile.(17,34]` + `currJobTenure_bucket_Response.(60,74]`, 
+               data = train)
+summary(model_6)
+
+model_7 <- glm(formula = PerformanceTag.1 ~ Income + currResidenceTenure + 
+                 currJobTenure + iscurrResidenceTenurelessthan8 + iscurrJobTenurelessthan4 + 
+                 `currJobTenure_bucket_Quartile.(17,34]` + `currJobTenure_bucket_Response.(60,74]`, 
+               data = train)
+summary(model_7)
+
+model_8 <- glm(formula = PerformanceTag.1 ~ Income + currResidenceTenure + 
+                 currJobTenure + iscurrResidenceTenurelessthan8 + iscurrJobTenurelessthan4 + 
+                 `currJobTenure_bucket_Response.(60,74]`, 
+               data = train)
+summary(model_8)
+
+model_9 <- glm(formula = PerformanceTag.1 ~ Income + currResidenceTenure + 
+                 currJobTenure + iscurrResidenceTenurelessthan8 + `currJobTenure_bucket_Response.(60,74]`, 
+               data = train)
+summary(model_9)
+
+final_model_demoData <- model_9
+# predicting the results in test dataset
+test$test_predict = predict(final_model_demoData, 
+                    newdata = test[,-1])
+
+# Let's see the summary 
+summary(test$test_predict)
+
+# Let's use the probability cutoff of 5%.
+
+test_pred <- factor(ifelse(test$test_predict >= 0.05, "1", "0"))
+test_actual <- factor(test$PerformanceTag.1)
+
+# Matrix
+table(test_pred,test_actual)
+
+library(e1071)
+test_conf <- confusionMatrix(test_pred, test_actual, positive = "1")
+test_conf
+
+## Finding the best threshold value
+perform_fn <- function(cutoff) 
+{
+  predicted <- factor(ifelse(test$test_predict >= cutoff, "1", "0"))
+  conf <- confusionMatrix(predicted, test_actual, positive = "1")
+  acc <- conf$overall[1]
+  sens <- conf$byClass[1]
+  spec <- conf$byClass[2]
+  out <- t(as.matrix(c(sens, spec, acc))) 
+  colnames(out) <- c("sensitivity", "specificity", "accuracy")
+  return(out)
+}
+
+# Summary of test probability
+summary(test$test_predict)
+s = seq(.01,.5,length=100)
+OUT = matrix(0,100,3)
+for(i in 1:100)
+{
+  OUT[i,] = perform_fn(s[i])
+} 
+
+plot(s, OUT[,1],xlab="Cutoff",ylab="Value",cex.lab=1.5,cex.axis=1.5,ylim=c(0,1),type="l",lwd=2,axes=FALSE,col=2)
+axis(1,seq(0,1,length=5),seq(0,1,length=5),cex.lab=1.5)
+axis(2,seq(0,1,length=5),seq(0,1,length=5),cex.lab=1.5)
+lines(s,OUT[,2],col="darkgreen",lwd=2)
+lines(s,OUT[,3],col=4,lwd=2)
+box()
+legend(0,.50,col=c(2,"lightgreen",4,"darkred"),lwd=c(2,2,2,2),c("Sensitivity","Specificity","Accuracy"))
+
+
+cutoff <- s[which.min(abs(OUT[, 1] - OUT[, 2]))]
+cutoff 
+# Let's choose a cutoff value of 0.04464646 for final model
+
+test_cutoff <- factor(ifelse(test$test_predict >=0.04464646, "1", "0"))
+
+conf_final <- confusionMatrix(test_cutoff, test_actual, positive = "1")
+acc <- conf_final$overall[1]
+sens <- conf_final$byClass[1]
+spec <- conf_final$byClass[2]
+
+acc
+# Accuracy 
+# 0.6192453
+sens
+# Sensitivity 
+# 0.5210643 
+spec
+# Specificity 
+# 0.6236602 
+
+######################## Model Building for finalData (using Logistic Regression) ##########################
+set.seed(100)
+trainindices= sample(1:nrow(finalData), 0.7*nrow(finalData))
+train = finalData[trainindices,]
+test = finalData[-trainindices,]
+
+## Logistic Regression ##
+## Initial Model using all the variables of Demo_Data ##
+model_1 <-glm(PerformanceTag.1~.,data=train)
+summary(model_1)
+
+## Running stepAIC
+step <- stepAIC(model_1, direction="both")
+summary(step)
+vif(step)
+
+### Fine tuning the Model ###
+model_2 <- glm(formula = PerformanceTag.1 ~ Age + iscurrResidenceTenurelessthan8 + 
+                 Gender.M + Profession.SE + `Age_bucket_Quartile.(37,45]` + 
+                 `Age_bucket_Quartile.(45,53]` + `Age_bucket_Quartile.(53,66]` + 
+                 `currResidenceTenure_bucket_Quartile.(10,61]` + `currResidenceTenure_bucket_Quartile.(61,123]` + 
+                 `currJobTenure_bucket_Quartile.(17,34]` + `currJobTenure_bucket_Quartile.(34,51]` + 
+                 `currJobTenure_bucket_Quartile.(51,74]` + `Age_bucket_Response.(36,56]` + 
+                 No_of_times_90_DPD_or_worse_in_last_6_months + 
+                 No_of_times_30_DPD_or_worse_in_last_6_months + No_of_times_90_DPD_or_worse_in_last_12_months + 
+                 Avgas_CC_Utilization_in_last_12_months + No_of_PL_trades_opened_in_last_6_months + 
+                 No_of_PL_trades_opened_in_last_12_months + No_of_Inquiries_in_last_6_months__excluding_home___auto_loans_ + 
+                 No_of_Inquiries_in_last_12_months__excluding_home___auto_loans_ + 
+                 Total_No_of_Trades + `Outstanding_Balance_Quartile.(2.09e+05,7.74e+05]`, 
+               data = train)
+summary(model_2)
+vif(model_2)
+
+model_3 <- glm(formula = PerformanceTag.1 ~ Age +  
+                 Gender.M + Profession.SE + `Age_bucket_Quartile.(37,45]` + 
+                 `Age_bucket_Quartile.(45,53]` + `Age_bucket_Quartile.(53,66]` + 
+                 `currResidenceTenure_bucket_Quartile.(10,61]` + `currResidenceTenure_bucket_Quartile.(61,123]` + 
+                 `currJobTenure_bucket_Quartile.(17,34]` + `currJobTenure_bucket_Quartile.(34,51]` + 
+                 `currJobTenure_bucket_Quartile.(51,74]` + `Age_bucket_Response.(36,56]` + 
+                 No_of_times_90_DPD_or_worse_in_last_6_months + 
+                 No_of_times_30_DPD_or_worse_in_last_6_months + No_of_times_90_DPD_or_worse_in_last_12_months + 
+                 Avgas_CC_Utilization_in_last_12_months + No_of_PL_trades_opened_in_last_6_months + 
+                 No_of_PL_trades_opened_in_last_12_months + No_of_Inquiries_in_last_6_months__excluding_home___auto_loans_ + 
+                 No_of_Inquiries_in_last_12_months__excluding_home___auto_loans_ + 
+                 Total_No_of_Trades + `Outstanding_Balance_Quartile.(2.09e+05,7.74e+05]`, 
+               data = train)
+summary(model_3)
+vif(model_3)
+
+model_4 <- glm(formula = PerformanceTag.1 ~   
+                 Gender.M + Profession.SE + `Age_bucket_Quartile.(37,45]` + 
+                 `Age_bucket_Quartile.(45,53]` + `Age_bucket_Quartile.(53,66]` + 
+                 `currResidenceTenure_bucket_Quartile.(10,61]` + `currResidenceTenure_bucket_Quartile.(61,123]` + 
+                 `currJobTenure_bucket_Quartile.(17,34]` + `currJobTenure_bucket_Quartile.(34,51]` + 
+                 `currJobTenure_bucket_Quartile.(51,74]` + `Age_bucket_Response.(36,56]` + 
+                 No_of_times_90_DPD_or_worse_in_last_6_months + 
+                 No_of_times_30_DPD_or_worse_in_last_6_months + No_of_times_90_DPD_or_worse_in_last_12_months + 
+                 Avgas_CC_Utilization_in_last_12_months + No_of_PL_trades_opened_in_last_6_months + 
+                 No_of_PL_trades_opened_in_last_12_months + No_of_Inquiries_in_last_6_months__excluding_home___auto_loans_ + 
+                 No_of_Inquiries_in_last_12_months__excluding_home___auto_loans_ + 
+                 Total_No_of_Trades + `Outstanding_Balance_Quartile.(2.09e+05,7.74e+05]`, 
+               data = train)
+summary(model_4)
+vif(model_4)
+
+model_5 <- glm(formula = PerformanceTag.1 ~   
+                 Gender.M + Profession.SE + `Age_bucket_Quartile.(37,45]` + 
+                 `Age_bucket_Quartile.(45,53]` + `Age_bucket_Quartile.(53,66]` + 
+                 `currResidenceTenure_bucket_Quartile.(10,61]` + `currResidenceTenure_bucket_Quartile.(61,123]` + 
+                 `currJobTenure_bucket_Quartile.(17,34]` + `currJobTenure_bucket_Quartile.(34,51]` + 
+                 `currJobTenure_bucket_Quartile.(51,74]` + `Age_bucket_Response.(36,56]` + 
+                 No_of_times_90_DPD_or_worse_in_last_6_months + 
+                 No_of_times_30_DPD_or_worse_in_last_6_months + No_of_times_90_DPD_or_worse_in_last_12_months + 
+                 Avgas_CC_Utilization_in_last_12_months + No_of_PL_trades_opened_in_last_12_months + No_of_Inquiries_in_last_12_months__excluding_home___auto_loans_ + 
+                 Total_No_of_Trades + `Outstanding_Balance_Quartile.(2.09e+05,7.74e+05]`, 
+               data = train)
+summary(model_5)
+vif(model_5)
+
+model_6 <- glm(formula = PerformanceTag.1 ~   
+                 Gender.M + Profession.SE + `Age_bucket_Quartile.(45,53]` + `Age_bucket_Quartile.(53,66]` + 
+                 `currResidenceTenure_bucket_Quartile.(10,61]` + `currResidenceTenure_bucket_Quartile.(61,123]` + 
+                 `currJobTenure_bucket_Quartile.(17,34]` + `currJobTenure_bucket_Quartile.(34,51]` + 
+                 `currJobTenure_bucket_Quartile.(51,74]` + `Age_bucket_Response.(36,56]` + 
+                 No_of_times_90_DPD_or_worse_in_last_6_months + 
+                 No_of_times_30_DPD_or_worse_in_last_6_months + No_of_times_90_DPD_or_worse_in_last_12_months + 
+                 Avgas_CC_Utilization_in_last_12_months + No_of_PL_trades_opened_in_last_12_months + No_of_Inquiries_in_last_12_months__excluding_home___auto_loans_ + 
+                 Total_No_of_Trades + `Outstanding_Balance_Quartile.(2.09e+05,7.74e+05]`, 
+               data = train)
+summary(model_6)
+vif(model_6)
+
+model_7 <- glm(formula = PerformanceTag.1 ~ Profession.SE + `Age_bucket_Quartile.(45,53]` + `Age_bucket_Quartile.(53,66]` + 
+                 `currResidenceTenure_bucket_Quartile.(10,61]` + `currResidenceTenure_bucket_Quartile.(61,123]` + 
+                 `currJobTenure_bucket_Quartile.(17,34]` + `currJobTenure_bucket_Quartile.(34,51]` + 
+                 `currJobTenure_bucket_Quartile.(51,74]` + `Age_bucket_Response.(36,56]` + 
+                 No_of_times_90_DPD_or_worse_in_last_6_months + 
+                 No_of_times_30_DPD_or_worse_in_last_6_months + No_of_times_90_DPD_or_worse_in_last_12_months + 
+                 Avgas_CC_Utilization_in_last_12_months + No_of_PL_trades_opened_in_last_12_months + No_of_Inquiries_in_last_12_months__excluding_home___auto_loans_ + 
+                 Total_No_of_Trades + `Outstanding_Balance_Quartile.(2.09e+05,7.74e+05]`, 
+               data = train)
+summary(model_7)
+
+model_8 <- glm(formula = PerformanceTag.1 ~ `Age_bucket_Quartile.(45,53]` + `Age_bucket_Quartile.(53,66]` + 
+                 `currResidenceTenure_bucket_Quartile.(10,61]` + `currResidenceTenure_bucket_Quartile.(61,123]` + 
+                 `currJobTenure_bucket_Quartile.(17,34]` + `currJobTenure_bucket_Quartile.(34,51]` + 
+                 `currJobTenure_bucket_Quartile.(51,74]` + `Age_bucket_Response.(36,56]` + 
+                 No_of_times_90_DPD_or_worse_in_last_6_months + 
+                 No_of_times_30_DPD_or_worse_in_last_6_months + No_of_times_90_DPD_or_worse_in_last_12_months + 
+                 Avgas_CC_Utilization_in_last_12_months + No_of_PL_trades_opened_in_last_12_months + No_of_Inquiries_in_last_12_months__excluding_home___auto_loans_ + 
+                 Total_No_of_Trades + `Outstanding_Balance_Quartile.(2.09e+05,7.74e+05]`, 
+               data = train)
+summary(model_8)
+
+model_9 <- glm(formula = PerformanceTag.1 ~ `Age_bucket_Quartile.(53,66]` + 
+                 `currResidenceTenure_bucket_Quartile.(10,61]` + `currResidenceTenure_bucket_Quartile.(61,123]` + 
+                 `currJobTenure_bucket_Quartile.(17,34]` + `currJobTenure_bucket_Quartile.(34,51]` + 
+                 `currJobTenure_bucket_Quartile.(51,74]` + `Age_bucket_Response.(36,56]` + 
+                 No_of_times_90_DPD_or_worse_in_last_6_months + 
+                 No_of_times_30_DPD_or_worse_in_last_6_months + No_of_times_90_DPD_or_worse_in_last_12_months + 
+                 Avgas_CC_Utilization_in_last_12_months + No_of_PL_trades_opened_in_last_12_months + No_of_Inquiries_in_last_12_months__excluding_home___auto_loans_ + 
+                 Total_No_of_Trades + `Outstanding_Balance_Quartile.(2.09e+05,7.74e+05]`, 
+               data = train)
+summary(model_9)
+
+model_10 <- glm(formula = PerformanceTag.1 ~ `currResidenceTenure_bucket_Quartile.(10,61]` + `currResidenceTenure_bucket_Quartile.(61,123]` + 
+                 `currJobTenure_bucket_Quartile.(17,34]` + `currJobTenure_bucket_Quartile.(34,51]` + 
+                 `currJobTenure_bucket_Quartile.(51,74]` + `Age_bucket_Response.(36,56]` + 
+                 No_of_times_90_DPD_or_worse_in_last_6_months + 
+                 No_of_times_30_DPD_or_worse_in_last_6_months + No_of_times_90_DPD_or_worse_in_last_12_months + 
+                 Avgas_CC_Utilization_in_last_12_months + No_of_PL_trades_opened_in_last_12_months + No_of_Inquiries_in_last_12_months__excluding_home___auto_loans_ + 
+                 Total_No_of_Trades + `Outstanding_Balance_Quartile.(2.09e+05,7.74e+05]`, 
+               data = train)
+summary(model_10)
+
+model_11 <- glm(formula = PerformanceTag.1 ~ `currResidenceTenure_bucket_Quartile.(61,123]` + 
+                  `currJobTenure_bucket_Quartile.(17,34]` + `currJobTenure_bucket_Quartile.(34,51]` + 
+                  `currJobTenure_bucket_Quartile.(51,74]` + `Age_bucket_Response.(36,56]` + 
+                  No_of_times_90_DPD_or_worse_in_last_6_months + 
+                  No_of_times_30_DPD_or_worse_in_last_6_months + No_of_times_90_DPD_or_worse_in_last_12_months + 
+                  Avgas_CC_Utilization_in_last_12_months + No_of_PL_trades_opened_in_last_12_months + No_of_Inquiries_in_last_12_months__excluding_home___auto_loans_ + 
+                  Total_No_of_Trades + `Outstanding_Balance_Quartile.(2.09e+05,7.74e+05]`, 
+                data = train)
+summary(model_11)
+
+model_12 <- glm(formula = PerformanceTag.1 ~ `currResidenceTenure_bucket_Quartile.(61,123]` + 
+                  `currJobTenure_bucket_Quartile.(17,34]` + `currJobTenure_bucket_Quartile.(34,51]` + 
+                  `currJobTenure_bucket_Quartile.(51,74]` + No_of_times_90_DPD_or_worse_in_last_6_months + 
+                  No_of_times_30_DPD_or_worse_in_last_6_months + No_of_times_90_DPD_or_worse_in_last_12_months + 
+                  Avgas_CC_Utilization_in_last_12_months + No_of_PL_trades_opened_in_last_12_months + No_of_Inquiries_in_last_12_months__excluding_home___auto_loans_ + 
+                  Total_No_of_Trades + `Outstanding_Balance_Quartile.(2.09e+05,7.74e+05]`, 
+                data = train)
+summary(model_12)
+vif(model_12)
+
+model_13 <- glm(formula = PerformanceTag.1 ~ `currResidenceTenure_bucket_Quartile.(61,123]` + 
+                  `currJobTenure_bucket_Quartile.(17,34]` + `currJobTenure_bucket_Quartile.(51,74]` + No_of_times_90_DPD_or_worse_in_last_6_months + 
+                  No_of_times_30_DPD_or_worse_in_last_6_months + No_of_times_90_DPD_or_worse_in_last_12_months + 
+                  Avgas_CC_Utilization_in_last_12_months + No_of_PL_trades_opened_in_last_12_months + No_of_Inquiries_in_last_12_months__excluding_home___auto_loans_ + 
+                  Total_No_of_Trades + `Outstanding_Balance_Quartile.(2.09e+05,7.74e+05]`, 
+                data = train)
+summary(model_13)
+
+model_14 <- glm(formula = PerformanceTag.1 ~ `currResidenceTenure_bucket_Quartile.(61,123]` + 
+                  `currJobTenure_bucket_Quartile.(17,34]` + No_of_times_90_DPD_or_worse_in_last_6_months + 
+                  No_of_times_30_DPD_or_worse_in_last_6_months + No_of_times_90_DPD_or_worse_in_last_12_months + 
+                  Avgas_CC_Utilization_in_last_12_months + No_of_PL_trades_opened_in_last_12_months + No_of_Inquiries_in_last_12_months__excluding_home___auto_loans_ + 
+                  Total_No_of_Trades + `Outstanding_Balance_Quartile.(2.09e+05,7.74e+05]`, 
+                data = train)
+summary(model_14)
+vif(model_14)
+
+model_15 <- glm(formula = PerformanceTag.1 ~ `currResidenceTenure_bucket_Quartile.(61,123]` + 
+                  `currJobTenure_bucket_Quartile.(17,34]` + No_of_times_90_DPD_or_worse_in_last_6_months + 
+                  No_of_times_30_DPD_or_worse_in_last_6_months + No_of_times_90_DPD_or_worse_in_last_12_months + 
+                  Avgas_CC_Utilization_in_last_12_months + No_of_PL_trades_opened_in_last_12_months + 
+                  Total_No_of_Trades + `Outstanding_Balance_Quartile.(2.09e+05,7.74e+05]`, 
+                data = train)
+summary(model_15)
+
+model_16 <- glm(formula = PerformanceTag.1 ~ `currJobTenure_bucket_Quartile.(17,34]` + No_of_times_90_DPD_or_worse_in_last_6_months + 
+                  No_of_times_30_DPD_or_worse_in_last_6_months + No_of_times_90_DPD_or_worse_in_last_12_months + 
+                  Avgas_CC_Utilization_in_last_12_months + No_of_PL_trades_opened_in_last_12_months + 
+                  Total_No_of_Trades + `Outstanding_Balance_Quartile.(2.09e+05,7.74e+05]`, 
+                data = train)
+summary(model_16)
+
+model_17 <- glm(formula = PerformanceTag.1 ~ No_of_times_90_DPD_or_worse_in_last_6_months + 
+                  No_of_times_30_DPD_or_worse_in_last_6_months + No_of_times_90_DPD_or_worse_in_last_12_months + 
+                  Avgas_CC_Utilization_in_last_12_months + No_of_PL_trades_opened_in_last_12_months + 
+                  Total_No_of_Trades + `Outstanding_Balance_Quartile.(2.09e+05,7.74e+05]`, 
+                data = train)
+summary(model_17)
+vif(model_17)
+
+model_18 <- glm(formula = PerformanceTag.1 ~ No_of_times_90_DPD_or_worse_in_last_6_months + 
+                  No_of_times_30_DPD_or_worse_in_last_6_months + No_of_times_90_DPD_or_worse_in_last_12_months + 
+                  Avgas_CC_Utilization_in_last_12_months + No_of_PL_trades_opened_in_last_12_months + `Outstanding_Balance_Quartile.(2.09e+05,7.74e+05]`, 
+                data = train)
+summary(model_18)
+vif(model_18)
+
+model_19 <- glm(formula = PerformanceTag.1 ~ No_of_times_30_DPD_or_worse_in_last_6_months + No_of_times_90_DPD_or_worse_in_last_12_months + 
+                  Avgas_CC_Utilization_in_last_12_months + No_of_PL_trades_opened_in_last_12_months + `Outstanding_Balance_Quartile.(2.09e+05,7.74e+05]`, 
+                data = train)
+summary(model_19)
+vif(model_19)
+
+final_model_finalData <- model_19
+
+# predicting the results in test dataset
+test$test_predict = predict(final_model_finalData, 
+                            newdata = test[,-1])
+
+# Let's see the summary 
+summary(test$test_predict)
+
+# Let's use the probability cutoff of 5%.
+
+test_pred <- factor(ifelse(test$test_predict >= 0.05, "1", "0"))
+test_actual <- factor(test$PerformanceTag.1)
+
+# Matrix
+table(test_pred,test_actual)
+
+library(e1071)
+test_conf <- confusionMatrix(test_pred, test_actual, positive = "1")
+test_conf
+
+## Finding the best threshold value
+perform_fn <- function(cutoff) 
+{
+  predicted <- factor(ifelse(test$test_predict >= cutoff, "1", "0"))
+  conf <- confusionMatrix(predicted, test_actual, positive = "1")
+  acc <- conf$overall[1]
+  sens <- conf$byClass[1]
+  spec <- conf$byClass[2]
+  out <- t(as.matrix(c(sens, spec, acc))) 
+  colnames(out) <- c("sensitivity", "specificity", "accuracy")
+  return(out)
+}
+
+# Summary of test probability
+summary(test$test_predict)
+s = seq(.01,.5,length=100)
+OUT = matrix(0,100,3)
+for(i in 1:100)
+{
+  OUT[i,] = perform_fn(s[i])
+} 
+
+plot(s, OUT[,1],xlab="Cutoff",ylab="Value",cex.lab=1.5,cex.axis=1.5,ylim=c(0,1),type="l",lwd=2,axes=FALSE,col=2)
+axis(1,seq(0,1,length=5),seq(0,1,length=5),cex.lab=1.5)
+axis(2,seq(0,1,length=5),seq(0,1,length=5),cex.lab=1.5)
+lines(s,OUT[,2],col="darkgreen",lwd=2)
+lines(s,OUT[,3],col=4,lwd=2)
+box()
+legend(0,.50,col=c(2,"lightgreen",4,"darkred"),lwd=c(2,2,2,2),c("Sensitivity","Specificity","Accuracy"))
+
+
+cutoff <- s[which.min(abs(OUT[, 1] - OUT[, 2]))]
+cutoff 
+# Let's choose a cutoff value of 0.04959596 for final model
+
+test_cutoff <- factor(ifelse(test$test_predict >=cutoff, "1", "0"))
+
+conf_final <- confusionMatrix(test_cutoff, test_actual, positive = "1")
+acc <- conf_final$overall[1]
+sens <- conf_final$byClass[1]
+spec <- conf_final$byClass[2]
+
+acc
+# Accuracy 
+# 0.6493965
+sens
+# Sensitivity 
+# 0.5931264 
+spec
+# Specificity 
+# 0.6519268
+
+#### On the basis of basic Logistic Modelling, we are getting an accuracy of ~65% for both the data sets ###
+
+############################# Model Building for demoData (using xgboost) ############################
+## Preprocessing ###
+gc(); rm(model_1,model_2,model_3,model_4,model_5,model_6,model_7,model_8,model_9,model_10,model_11,model_12,model_13)
+rm(model_14,model_15,model_16,model_17,model_18,model_19,step,p1,p2,p3,p4,p5,p6,p7,p8,p9,p10)
+gc()
+
+### Initial Quality Checks ###
+sum(is.na(demoData)) ## 0 nulls
+sum(sapply(demoData, function(x)
+  length(which(x == "")))) # checking for blank "" values; there are none, now
+
+demoData %>% group_by(PerformanceTag.1) %>% summarise(n = n()) ## Positive Cases are 1/33th of negatives, so, data set is unbalanced
+## So, we will use different kind of sampling methologies, and compare the performance of each
+
+### Splitting demoData Data into train and test, further ###
+set.seed(123)
+split_indices <- sample.split(demoData$PerformanceTag.1, SplitRatio = 0.7)
+trainModel <- demoData[split_indices,]
+testModel <- demoData[!split_indices,]
+nrow(trainModel) / nrow(demoData)
+nrow(testModel) / nrow(demoData)
+
+### Random Forests, can be used, in here, but takes lot of time, so, we will use Gradient Boosting,
+### which produces same results, but faster
+
+#install.packages("unbalanced")
+library(unbalanced)
+library(gbm)
+
+trainModel <- as.data.frame(trainModel)
+trainModel$PerformanceTag.1 <- as.factor(trainModel$PerformanceTag.1)
+set.seed(132)
+dataSMOTE <-
+  ubBalance(
+    X = trainModel[, -1],
+    Y = trainModel[, 1],
+    type = "ubSMOTE",
+    percOver = 900,
+    percUnder = 600,
+    verbose = TRUE,
+    positive = "1"
+  )
+trainBoostData <- cbind(dataSMOTE$X, dataSMOTE$Y)
+n <- ncol(trainBoostData)
+colnames(trainBoostData)[n] <- "PerformanceTag.1"
+summary(trainBoostData$PerformanceTag.1)
+table(trainBoostData$PerformanceTag.1)
+
+### Building Boosting tree Model ###
+fitcontrol <-
+  trainControl(
+    method = "repeatedcv",
+    number = 10,
+    repeats = 1,
+    verbose = TRUE
+  )
+
+pb <- tkProgressBar(title = "progress bar", min = 0, max = 10, width = 300)
+
+for(i in 1:total){
+  Sys.sleep(0.1)
+  setTkProgressBar(pb, i, label=paste( round(i/10*100, 0),
+                                       "% done"))
+}
+close(pb)
+
+gbmfit <-
+  caret::train(PerformanceTag.1 ~ .,
+               data = trainBoostData,
+               method = "gbm",
+               verbose = TRUE)
+
+### predicted probabilities of Churn 1 for test data
+
+test_pred = predict(gbmfit, type = "prob",
+                    newdata = testModel[, -1])[, -1]
+# Let's see the summary
+summary(test_pred)
+
+# Let's use the probability cutoff of 5%.
+test_pred <- factor(ifelse(test_pred >= 0.05, "1", "0"))
+test_actual <- factor(testModel$PerformanceTag.1)
+testModel$PerformanceTag.1 <- test_actual
+test_actual <- factor(test_actual)
+testModel$PerformanceTag.1 <- factor(testModel$PerformanceTag.1)
+
+test_conf <- confusionMatrix(test_pred, test_actual, positive = "1")
+test_conf
+
+# Finding out the optimal probalility cutoff
+
+perform_fn <- function(cutoff)
+{
+  predicted <- factor(ifelse(test_pred >= cutoff, "1", "0"))
+  conf <- confusionMatrix(predicted, test_actual, positive = "1")
+  acc <- conf$overall[1]
+  sens <- conf$byClass[1]
+  spec <- conf$byClass[2]
+  out <- t(as.matrix(c(sens, spec, acc)))
+  colnames(out) <- c("sensitivity", "specificity", "accuracy")
+  return(out)
+}
+
+# Summary of test probability
+test_pred = predict(gbmfit, type = "prob",
+                    newdata = testModel[, -1])[, -1]
+summary(test_pred)
+s = seq(.01, .14, length = 100)
+OUT = matrix(0, 100, 3)
+for (i in 1:100)
+{
+  OUT[i, ] = perform_fn(s[i])
+}
+
+plot(
+  s,
+  OUT[, 1],
+  xlab = "Cutoff",
+  ylab = "Value",
+  cex.lab = 1.5,
+  cex.axis = 1.5,
+  ylim = c(0, 1),
+  type = "l",
+  lwd = 2,
+  axes = FALSE,
+  col = 2
+)
+axis(1, seq(0, 1, length = 5), seq(0, 1, length = 5), cex.lab = 1.5)
+axis(2, seq(0, 1, length = 5), seq(0, 1, length = 5), cex.lab = 1.5)
+lines(s, OUT[, 2], col = "darkgreen", lwd = 2)
+lines(s, OUT[, 3], col = 4, lwd = 2)
+box()
+legend(
+  0,
+  .50,
+  col = c(2, "darkgreen", 4, "darkred"),
+  lwd = c(2, 2, 2, 2),
+  c("Sensitivity", "Specificity", "Accuracy")
+)
+
+
+cutoff <- s[which.min(abs(OUT[, 1] - OUT[, 2]))]
+cutoff ## 0.05727273
+
+# Let's choose a cutoff value of 0.05727273 for final model
+test_pred = predict(gbmfit, type = "prob",
+                    newdata = testModel[, -1])[, -1]
+test_cutoff <- factor(ifelse(test_pred > cutoff, "1", "0"))
+
+conf_final <-
+  confusionMatrix(test_cutoff, test_actual, positive = "1")
+acc <- conf_final$overall[1]
+sens <- conf_final$byClass[1]
+spec <- conf_final$byClass[2]
+
+acc
+# Accuracy
+# 0.5678641
+sens
+# Sensitivity
+# 0.5373303
+spec
+# Specificity
+# 0.5692085
+
+################## Model Building for the final Data (using xgboost) #################
+### Initial Quality Checks ###
+sum(is.na(finalData)) ## 0 nulls
+sum(sapply(finalData, function(x)
+  length(which(x == "")))) # checking for blank "" values; there are none, now
+
+finalData %>% group_by(PerformanceTag.1) %>% summarise(n = n()) ## Positive Cases are 1/33th of negatives, so, data set is unbalanced
+## So, we will use different kind of sampling methologies, and compare the performance of each
+
+### Splitting finalData Data into train and test, further ###
+set.seed(123)
+split_indices <- sample.split(finalData$PerformanceTag.1, SplitRatio = 0.7)
+trainModel <- finalData[split_indices,]
+testModel <- finalData[!split_indices,]
+nrow(trainModel) / nrow(finalData)
+nrow(testModel) / nrow(finalData)
+
+### Random Forests, can be used, in here, but takes lot of time, so, we will use Gradient Boosting,
+### which produces same results, but faster
+
+trainModel <- as.data.frame(trainModel)
+trainModel$PerformanceTag.1 <- as.factor(trainModel$PerformanceTag.1)
+set.seed(132)
+dataSMOTE <-
+  ubBalance(
+    X = trainModel[, -1],
+    Y = trainModel[, 1],
+    type = "ubSMOTE",
+    percOver = 900,
+    percUnder = 600,
+    verbose = TRUE,
+    positive = "1"
+  )
+trainBoostData <- cbind(dataSMOTE$X, dataSMOTE$Y)
+n <- ncol(trainBoostData)
+colnames(trainBoostData)[n] <- "PerformanceTag.1"
+summary(trainBoostData$PerformanceTag.1)
+table(trainBoostData$PerformanceTag.1)
+
+### Building Boosting tree Model ###
+fitcontrol <-
+  trainControl(
+    method = "repeatedcv",
+    number = 10,
+    repeats = 1,
+    verbose = TRUE
+  )
+gbmfit <-
+  caret::train(PerformanceTag.1 ~ .,
+               data = trainBoostData,
+               method = "gbm",
+               verbose = TRUE)
+
+### predicted probabilities for test data
+
+test_pred = predict(gbmfit, type = "prob",
+                    newdata = testModel[, -1])[, -1]
+# Let's see the summary
+summary(test_pred)
+
+# Let's use the probability cutoff of 5%.
+test_pred <- factor(ifelse(test_pred >= 0.05, "1", "0"))
+test_actual <- factor(testModel$PerformanceTag.1)
+testModel$PerformanceTag.1 <- test_actual
+test_actual <- factor(test_actual)
+testModel$PerformanceTag.1 <- factor(testModel$PerformanceTag.1)
+
+test_conf <- confusionMatrix(test_pred, test_actual, positive = "1")
+test_conf
+
+# Finding out the optimal probalility cutoff
+
+perform_fn <- function(cutoff)
+{
+  predicted <- factor(ifelse(test_pred >= cutoff, "1", "0"))
+  conf <- confusionMatrix(predicted, test_actual, positive = "1")
+  acc <- conf$overall[1]
+  sens <- conf$byClass[1]
+  spec <- conf$byClass[2]
+  out <- t(as.matrix(c(sens, spec, acc)))
+  colnames(out) <- c("sensitivity", "specificity", "accuracy")
+  return(out)
+}
+
+# Summary of test probability
+test_pred = predict(gbmfit, type = "prob",
+                    newdata = testModel[, -1])[, -1]
+summary(test_pred)
+s = seq(.01, .14, length = 100)
+OUT = matrix(0, 100, 3)
+for (i in 1:100)
+{
+  OUT[i, ] = perform_fn(s[i])
+}
+
+plot(
+  s,
+  OUT[, 1],
+  xlab = "Cutoff",
+  ylab = "Value",
+  cex.lab = 1.5,
+  cex.axis = 1.5,
+  ylim = c(0, 1),
+  type = "l",
+  lwd = 2,
+  axes = TRUE,
+  col = 2
+)
+axis(1, seq(0, 1, length = 5), seq(0, 1, length = 5), cex.lab = 1.5)
+axis(2, seq(0, 1, length = 5), seq(0, 1, length = 5), cex.lab = 1.5)
+lines(s, OUT[, 2], col = "darkgreen", lwd = 2)
+lines(s, OUT[, 3], col = 4, lwd = 2)
+box()
+legend(
+  0,
+  .50,
+  col = c(2, "darkgreen", 4, "darkred"),
+  lwd = c(2, 2, 2, 2),
+  c("Sensitivity", "Specificity", "Accuracy")
+)
+
+
+cutoff <- s[which.min(abs(OUT[, 1] - OUT[, 2]))]
+cutoff ## 0.04676768
+
+# Let's choose a cutoff value of 0.04676768 for final model
+test_pred = predict(gbmfit, type = "prob",
+                    newdata = testModel[, -1])[, -1]
+test_cutoff <- factor(ifelse(test_pred > cutoff, "1", "0"))
+
+conf_final <-
+  confusionMatrix(test_cutoff, test_actual, positive = "1")
+acc <- conf_final$overall[1]
+sens <- conf_final$byClass[1]
+spec <- conf_final$byClass[2]
+
+acc
+# Accuracy
+# 0.6121368
+sens
+# Sensitivity
+# 0.60181
+spec
+# Specificity
+# 0.6125915
+
+
+######################## Modelling using woe imputed Data (Final Data)  ###################
+### Preparing woe final dataset
+nrow(demoData_woe); nrow(creditBureauData_woe)
+final_woe <- cbind(demoData_woe, creditBureauData_woe)
+final_woe <- final_woe[,-c("ApplicationID","Application.ID","PerformanceTag")]
+colnames(final_woe) <- gsub("\\.","",names(final_woe))
+final_woe <- as.data.frame(final_woe)
+str(final_woe)
+final_woe$Gender <- as.factor(final_woe$Gender)
+final_woe$MaritalStatus <- as.factor(final_woe$MaritalStatus)
+final_woe$Dependents <- as.numeric(final_woe$Dependents)
+final_woe$Education <- as.factor(final_woe$Education)
+final_woe$Profession <- as.factor(final_woe$Profession)
+final_woe$TypeofResidence <- as.factor(final_woe$TypeofResidence)
+
+
+outiv <- iv.mult(final_woe,"PerformanceTag")
+
+## Relacing the woe final dataset with respective woe values
+final_woe <- final_woe[,!(names(final_woe) %in% c("Age","Gender","MaritalStatus","Dependents","Education","Profession",
+                                                  "TypeofResidence","currJobTenure","Presenceofopenhomeloan","Presenceofopenautoloan"))]
+outiv <- iv.mult(final_woe,"PerformanceTag")
+woe_test <- iv.replace.woe(final_woe,iv=outiv)
+final_woe <- woe_test[,18:ncol(woe_test)]
+#final_woe$PerformanceTag <- as.numeric(final_woe$PerformanceTag)
+final_woe$PerformanceTag <- as.numeric(ifelse(final_woe$PerformanceTag==1,1,0))
+final_woeForest <- final_woe
+final_woe <- cbind(final_woe,finalData)
+final_woe <- final_woe[,-19]
+
+### Model Building for final_woe(using Logistic Regression) ###
+set.seed(100)
+trainindices= sample(1:nrow(final_woe), 0.7*nrow(final_woe))
+train = final_woe[trainindices,]
+test = final_woe[-trainindices,]
+
+## Logistic Regression ##
+## Initial Model using all the variables of Demo_Data ##
+model_1 <-glm(PerformanceTag~.,data=train)
+summary(model_1)
+vif(model_1)
+
+## Running stepAIC
+step <- stepAIC(model_1, direction="both")
+summary(step)
+vif(step)
+
+## Further Model Building Processess ###
+model_2 <- glm(formula = PerformanceTag ~ Income_woe + currResidenceTenure_woe + 
+                 Nooftimes90DPDorworseinlast12months_woe + AvgasCCUtilizationinlast12months_woe + 
+                 Nooftradesopenedinlast12months_woe + NoofPLtradesopenedinlast6months_woe + 
+                 NoofInquiriesinlast12monthsexcludinghomeautoloans_woe + OutstandingBalance_woe + 
+                 Age + Gender.M + Profession.SE + `Age_bucket_Quartile.(37,45]` + 
+                 `Age_bucket_Quartile.(45,53]` + `Age_bucket_Quartile.(53,66]` + 
+                 `Income_bucket_Quartile.(27,40]` + `Income_bucket_Quartile.(40,61]` + 
+                 `currResidenceTenure_bucket_Quartile.(10,61]` + `currResidenceTenure_bucket_Quartile.(61,123]` + 
+                 `currJobTenure_bucket_Quartile.(17,34]` + `currJobTenure_bucket_Quartile.(34,51]` + 
+                 `currJobTenure_bucket_Quartile.(51,74]` + `Age_bucket_Response.(36,56]` + 
+                 No_of_times_90_DPD_or_worse_in_last_6_months + No_of_times_30_DPD_or_worse_in_last_6_months + No_of_times_90_DPD_or_worse_in_last_12_months + 
+                 No_of_trades_opened_in_last_12_months + No_of_PL_trades_opened_in_last_6_months + 
+                 No_of_PL_trades_opened_in_last_12_months, data = train)
+summary(model_2)
+vif(model_2)
+
+model_3 <- glm(formula = PerformanceTag ~ Income_woe + currResidenceTenure_woe + 
+                 Nooftimes90DPDorworseinlast12months_woe + AvgasCCUtilizationinlast12months_woe + 
+                 Nooftradesopenedinlast12months_woe + NoofPLtradesopenedinlast6months_woe + 
+                 NoofInquiriesinlast12monthsexcludinghomeautoloans_woe + OutstandingBalance_woe + Gender.M + Profession.SE + Age +
+                 `Income_bucket_Quartile.(27,40]` + `Income_bucket_Quartile.(40,61]` + 
+                 `currResidenceTenure_bucket_Quartile.(10,61]` + `currResidenceTenure_bucket_Quartile.(61,123]` + 
+                 `currJobTenure_bucket_Quartile.(17,34]` + `currJobTenure_bucket_Quartile.(34,51]` + 
+                 `currJobTenure_bucket_Quartile.(51,74]` +  
+                 No_of_times_90_DPD_or_worse_in_last_6_months + No_of_times_30_DPD_or_worse_in_last_6_months + No_of_times_90_DPD_or_worse_in_last_12_months + 
+                 No_of_trades_opened_in_last_12_months + No_of_PL_trades_opened_in_last_6_months + 
+                 No_of_PL_trades_opened_in_last_12_months, data = train)
+summary(model_3)
+vif(model_3)
+
+model_4 <- glm(formula = PerformanceTag ~ Income_woe + currResidenceTenure_woe + 
+                 Nooftimes90DPDorworseinlast12months_woe + AvgasCCUtilizationinlast12months_woe + 
+                 Nooftradesopenedinlast12months_woe + NoofPLtradesopenedinlast6months_woe + 
+                 NoofInquiriesinlast12monthsexcludinghomeautoloans_woe + OutstandingBalance_woe + Gender.M + Profession.SE + Age +
+                 `Income_bucket_Quartile.(27,40]` + `Income_bucket_Quartile.(40,61]` + 
+                 `currResidenceTenure_bucket_Quartile.(10,61]` + `currResidenceTenure_bucket_Quartile.(61,123]` + 
+                 `currJobTenure_bucket_Quartile.(17,34]` + `currJobTenure_bucket_Quartile.(34,51]` + 
+                 `currJobTenure_bucket_Quartile.(51,74]` +  
+                 No_of_times_90_DPD_or_worse_in_last_6_months + No_of_times_30_DPD_or_worse_in_last_6_months + No_of_times_90_DPD_or_worse_in_last_12_months + 
+                 No_of_trades_opened_in_last_12_months + No_of_PL_trades_opened_in_last_6_months, data = train)
+summary(model_4)
+vif(model_4)
+
+model_5 <- glm(formula = PerformanceTag ~ Income_woe + currResidenceTenure_woe + 
+                 Nooftimes90DPDorworseinlast12months_woe + AvgasCCUtilizationinlast12months_woe + 
+                 Nooftradesopenedinlast12months_woe + NoofPLtradesopenedinlast6months_woe + 
+                 NoofInquiriesinlast12monthsexcludinghomeautoloans_woe + OutstandingBalance_woe + Gender.M + Profession.SE + Age +
+                 `Income_bucket_Quartile.(27,40]` + `Income_bucket_Quartile.(40,61]` + 
+                 `currResidenceTenure_bucket_Quartile.(10,61]` + `currResidenceTenure_bucket_Quartile.(61,123]` + 
+                 `currJobTenure_bucket_Quartile.(17,34]` + `currJobTenure_bucket_Quartile.(34,51]` + 
+                 `currJobTenure_bucket_Quartile.(51,74]` +  
+                 No_of_times_90_DPD_or_worse_in_last_6_months + No_of_times_30_DPD_or_worse_in_last_6_months + No_of_times_90_DPD_or_worse_in_last_12_months + No_of_PL_trades_opened_in_last_6_months, data = train)
+summary(model_5)
+vif(model_5)
+
+model_6 <- glm(formula = PerformanceTag ~ Income_woe + currResidenceTenure_woe + 
+                 Nooftimes90DPDorworseinlast12months_woe + AvgasCCUtilizationinlast12months_woe + 
+                 Nooftradesopenedinlast12months_woe + NoofPLtradesopenedinlast6months_woe + 
+                 NoofInquiriesinlast12monthsexcludinghomeautoloans_woe + OutstandingBalance_woe + Profession.SE + Age +
+                 `Income_bucket_Quartile.(27,40]` + `Income_bucket_Quartile.(40,61]` + 
+                 `currResidenceTenure_bucket_Quartile.(10,61]` + `currResidenceTenure_bucket_Quartile.(61,123]` + 
+                 `currJobTenure_bucket_Quartile.(17,34]` + `currJobTenure_bucket_Quartile.(34,51]` + 
+                 `currJobTenure_bucket_Quartile.(51,74]` +  
+                 No_of_times_90_DPD_or_worse_in_last_6_months + No_of_times_30_DPD_or_worse_in_last_6_months + No_of_times_90_DPD_or_worse_in_last_12_months + No_of_PL_trades_opened_in_last_6_months, data = train)
+summary(model_6)
+vif(model_6)
+
+model_7 <- glm(formula = PerformanceTag ~ Income_woe + currResidenceTenure_woe + 
+                 Nooftimes90DPDorworseinlast12months_woe + AvgasCCUtilizationinlast12months_woe + 
+                 Nooftradesopenedinlast12months_woe + NoofPLtradesopenedinlast6months_woe + 
+                 NoofInquiriesinlast12monthsexcludinghomeautoloans_woe + OutstandingBalance_woe + Profession.SE +
+                 `Income_bucket_Quartile.(27,40]` + `Income_bucket_Quartile.(40,61]` + 
+                 `currResidenceTenure_bucket_Quartile.(10,61]` + `currResidenceTenure_bucket_Quartile.(61,123]` + 
+                 `currJobTenure_bucket_Quartile.(17,34]` + `currJobTenure_bucket_Quartile.(34,51]` + 
+                 `currJobTenure_bucket_Quartile.(51,74]` +  
+                 No_of_times_90_DPD_or_worse_in_last_6_months + No_of_times_30_DPD_or_worse_in_last_6_months + No_of_times_90_DPD_or_worse_in_last_12_months + No_of_PL_trades_opened_in_last_6_months, data = train)
+summary(model_7)
+vif(model_7)
+
+model_8 <- glm(formula = PerformanceTag ~ Income_woe + currResidenceTenure_woe + 
+                 Nooftimes90DPDorworseinlast12months_woe + AvgasCCUtilizationinlast12months_woe + 
+                 Nooftradesopenedinlast12months_woe + NoofPLtradesopenedinlast6months_woe + 
+                 NoofInquiriesinlast12monthsexcludinghomeautoloans_woe + OutstandingBalance_woe +
+                 `Income_bucket_Quartile.(27,40]` + `Income_bucket_Quartile.(40,61]` + 
+                 `currResidenceTenure_bucket_Quartile.(10,61]` + `currResidenceTenure_bucket_Quartile.(61,123]` + 
+                 `currJobTenure_bucket_Quartile.(17,34]` + `currJobTenure_bucket_Quartile.(34,51]` + 
+                 `currJobTenure_bucket_Quartile.(51,74]` +  
+                 No_of_times_90_DPD_or_worse_in_last_6_months + No_of_times_30_DPD_or_worse_in_last_6_months + No_of_times_90_DPD_or_worse_in_last_12_months + No_of_PL_trades_opened_in_last_6_months, data = train)
+summary(model_8)
+vif(model_8)
+
+model_9 <- glm(formula = PerformanceTag ~ Income_woe + currResidenceTenure_woe + 
+                 Nooftimes90DPDorworseinlast12months_woe + AvgasCCUtilizationinlast12months_woe + 
+                 Nooftradesopenedinlast12months_woe + NoofPLtradesopenedinlast6months_woe + 
+                 NoofInquiriesinlast12monthsexcludinghomeautoloans_woe + OutstandingBalance_woe +
+                 `Income_bucket_Quartile.(27,40]` + `Income_bucket_Quartile.(40,61]` + 
+                 `currResidenceTenure_bucket_Quartile.(10,61]` + `currResidenceTenure_bucket_Quartile.(61,123]` + 
+                 `currJobTenure_bucket_Quartile.(17,34]` + 
+                 `currJobTenure_bucket_Quartile.(51,74]` +  
+                 No_of_times_90_DPD_or_worse_in_last_6_months + No_of_times_30_DPD_or_worse_in_last_6_months + No_of_times_90_DPD_or_worse_in_last_12_months + No_of_PL_trades_opened_in_last_6_months, data = train)
+summary(model_9)
+vif(model_9)
+
+model_10 <- glm(formula = PerformanceTag ~ Income_woe + currResidenceTenure_woe + 
+                 Nooftimes90DPDorworseinlast12months_woe + AvgasCCUtilizationinlast12months_woe + 
+                 Nooftradesopenedinlast12months_woe + NoofPLtradesopenedinlast6months_woe + OutstandingBalance_woe +
+                 `Income_bucket_Quartile.(27,40]` + `Income_bucket_Quartile.(40,61]` + 
+                 `currResidenceTenure_bucket_Quartile.(10,61]` + `currResidenceTenure_bucket_Quartile.(61,123]` + 
+                 `currJobTenure_bucket_Quartile.(17,34]` + 
+                 `currJobTenure_bucket_Quartile.(51,74]` +  
+                 No_of_times_90_DPD_or_worse_in_last_6_months + No_of_times_30_DPD_or_worse_in_last_6_months + No_of_times_90_DPD_or_worse_in_last_12_months + No_of_PL_trades_opened_in_last_6_months, data = train)
+summary(model_10)
+vif(model_10)
+
+model_11 <- glm(formula = PerformanceTag ~ Income_woe + currResidenceTenure_woe + 
+                  Nooftimes90DPDorworseinlast12months_woe + AvgasCCUtilizationinlast12months_woe + 
+                  Nooftradesopenedinlast12months_woe + NoofPLtradesopenedinlast6months_woe + OutstandingBalance_woe +
+                  `Income_bucket_Quartile.(27,40]` + `Income_bucket_Quartile.(40,61]` + 
+                  `currResidenceTenure_bucket_Quartile.(10,61]` + `currResidenceTenure_bucket_Quartile.(61,123]` + 
+                  `currJobTenure_bucket_Quartile.(17,34]` + 
+                  `currJobTenure_bucket_Quartile.(51,74]` +  
+                  No_of_times_90_DPD_or_worse_in_last_6_months + No_of_times_30_DPD_or_worse_in_last_6_months + No_of_PL_trades_opened_in_last_6_months, data = train)
+summary(model_11)
+vif(model_11)
+
+model_12 <- glm(formula = PerformanceTag ~ Income_woe + currResidenceTenure_woe + 
+                  Nooftimes90DPDorworseinlast12months_woe + AvgasCCUtilizationinlast12months_woe + 
+                  Nooftradesopenedinlast12months_woe + NoofPLtradesopenedinlast6months_woe + OutstandingBalance_woe +
+                  `Income_bucket_Quartile.(27,40]` + `Income_bucket_Quartile.(40,61]` + 
+                  `currResidenceTenure_bucket_Quartile.(10,61]` + `currResidenceTenure_bucket_Quartile.(61,123]` + 
+                  `currJobTenure_bucket_Quartile.(17,34]` + No_of_times_90_DPD_or_worse_in_last_6_months + No_of_times_30_DPD_or_worse_in_last_6_months + No_of_PL_trades_opened_in_last_6_months, data = train)
+summary(model_12)
+vif(model_12)
+
+model_13 <- glm(formula = PerformanceTag ~ Income_woe + currResidenceTenure_woe + 
+                  Nooftimes90DPDorworseinlast12months_woe + AvgasCCUtilizationinlast12months_woe + 
+                  Nooftradesopenedinlast12months_woe + OutstandingBalance_woe +
+                  `Income_bucket_Quartile.(27,40]` + `Income_bucket_Quartile.(40,61]` + 
+                  `currResidenceTenure_bucket_Quartile.(10,61]` + `currResidenceTenure_bucket_Quartile.(61,123]` + 
+                  `currJobTenure_bucket_Quartile.(17,34]` + No_of_times_90_DPD_or_worse_in_last_6_months + No_of_times_30_DPD_or_worse_in_last_6_months + No_of_PL_trades_opened_in_last_6_months, data = train)
+summary(model_13)
+vif(model_13)
+
+model_14 <- glm(formula = PerformanceTag ~ Income_woe + currResidenceTenure_woe + 
+                  Nooftimes90DPDorworseinlast12months_woe + AvgasCCUtilizationinlast12months_woe + 
+                  Nooftradesopenedinlast12months_woe + `Income_bucket_Quartile.(27,40]` + `Income_bucket_Quartile.(40,61]` + 
+                  `currResidenceTenure_bucket_Quartile.(10,61]` + `currResidenceTenure_bucket_Quartile.(61,123]` + 
+                  `currJobTenure_bucket_Quartile.(17,34]` + No_of_times_90_DPD_or_worse_in_last_6_months + No_of_times_30_DPD_or_worse_in_last_6_months + No_of_PL_trades_opened_in_last_6_months, data = train)
+summary(model_14)
+vif(model_14)
+
+model_15 <- glm(formula = PerformanceTag ~ Income_woe + currResidenceTenure_woe + 
+                  Nooftimes90DPDorworseinlast12months_woe + AvgasCCUtilizationinlast12months_woe + 
+                  Nooftradesopenedinlast12months_woe + `Income_bucket_Quartile.(27,40]` + `Income_bucket_Quartile.(40,61]` + 
+                  `currResidenceTenure_bucket_Quartile.(10,61]` + `currResidenceTenure_bucket_Quartile.(61,123]` + 
+                  `currJobTenure_bucket_Quartile.(17,34]` + No_of_times_90_DPD_or_worse_in_last_6_months + No_of_times_30_DPD_or_worse_in_last_6_months, data = train)
+summary(model_15)
+vif(model_15)
+
+model_16 <- glm(formula = PerformanceTag ~ currResidenceTenure_woe + 
+                  Nooftimes90DPDorworseinlast12months_woe + AvgasCCUtilizationinlast12months_woe + 
+                  Nooftradesopenedinlast12months_woe +  
+                  `currResidenceTenure_bucket_Quartile.(10,61]` + `currResidenceTenure_bucket_Quartile.(61,123]` + 
+                  `currJobTenure_bucket_Quartile.(17,34]` + No_of_times_90_DPD_or_worse_in_last_6_months + No_of_times_30_DPD_or_worse_in_last_6_months, data = train)
+summary(model_16)
+vif(model_16)
+
+model_17 <- glm(formula = PerformanceTag ~ currResidenceTenure_woe + 
+                  Nooftimes90DPDorworseinlast12months_woe + AvgasCCUtilizationinlast12months_woe + 
+                  Nooftradesopenedinlast12months_woe +  
+                  `currResidenceTenure_bucket_Quartile.(10,61]` + `currResidenceTenure_bucket_Quartile.(61,123]` + No_of_times_90_DPD_or_worse_in_last_6_months + No_of_times_30_DPD_or_worse_in_last_6_months, data = train)
+summary(model_17)
+vif(model_17)
+# predicting the results in test dataset
+test$test_predict = predict(model_17, 
+                            newdata = test[,-1])
+
+# Let's see the summary 
+summary(test$test_predict)
+
+# Let's use the probability cutoff of 5%.
+
+test_pred <- factor(ifelse(test$test_predict >= 0.05, "1", "0"))
+test_actual <- factor(test$PerformanceTag)
+
+# Matrix
+table(test_pred,test_actual)
+
+library(e1071)
+test_conf <- confusionMatrix(test_pred, test_actual, positive = "1")
+test_conf
+
+## Finding the best threshold value
+perform_fn <- function(cutoff) 
+{
+  predicted <- factor(ifelse(test$test_predict >= cutoff, "1", "0"))
+  conf <- confusionMatrix(predicted, test_actual, positive = "1")
+  acc <- conf$overall[1]
+  sens <- conf$byClass[1]
+  spec <- conf$byClass[2]
+  out <- t(as.matrix(c(sens, spec, acc))) 
+  colnames(out) <- c("sensitivity", "specificity", "accuracy")
+  return(out)
+}
+
+# Summary of test probability
+summary(test$test_predict)
+s = seq(.01,.5,length=100)
+OUT = matrix(0,100,3)
+for(i in 1:100)
+{
+  OUT[i,] = perform_fn(s[i])
+} 
+
+plot(s, OUT[,1],xlab="Cutoff",ylab="Value",cex.lab=1.5,cex.axis=1.5,ylim=c(0,1),type="l",lwd=2,axes=FALSE,col=2)
+axis(1,seq(0,1,length=5),seq(0,1,length=5),cex.lab=1.5)
+axis(2,seq(0,1,length=5),seq(0,1,length=5),cex.lab=1.5)
+lines(s,OUT[,2],col="darkgreen",lwd=2)
+lines(s,OUT[,3],col=4,lwd=2)
+box()
+legend(0,.50,col=c(2,"lightgreen",4,"darkred"),lwd=c(2,2,2,2),c("Sensitivity","Specificity","Accuracy"))
+
+
+cutoff <- s[which.min(abs(OUT[, 1] - OUT[, 2]))]
+cutoff 
+# Let's choose a cutoff value of 0.04959596 for final model
+
+test_cutoff <- factor(ifelse(test$test_predict >= 0.05, "1", "0"))
+
+conf_final <- confusionMatrix(test_cutoff, test_actual, positive = "1")
+acc <- conf_final$overall[1]
+sens <- conf_final$byClass[1]
+spec <- conf_final$byClass[2]
+
+acc
+# Accuracy 
+# 0.6542627
+sens
+# Sensitivity 
+# 0.5984163 
+spec
+# Specificity 
+# 0.6567216 
+
+######### Modelling using xgboost #########
+set.seed(123)
+split_indices <- sample.split(final_woe$PerformanceTag, SplitRatio = 0.7)
+trainModel <- final_woe[split_indices,]
+testModel <- final_woe[!split_indices,]
+
+### Random Forests, can be used, in here, but takes lot of time, so, we will use Gradient Boosting,
+### which produces same results, but faster
+library(unbalanced)
+trainModel <- as.data.frame(trainModel)
+trainModel$PerformanceTag <- as.factor(trainModel$PerformanceTag)
+set.seed(132)
+dataSMOTE <-
+  ubBalance(
+    X = trainModel[, -1],
+    Y = trainModel[, 1],
+    type = "ubSMOTE",
+    percOver = 900,
+    percUnder = 600,
+    verbose = TRUE,
+    positive = "1"
+  )
+trainBoostData <- cbind(dataSMOTE$X, dataSMOTE$Y)
+n <- ncol(trainBoostData)
+colnames(trainBoostData)[n] <- "PerformanceTag"
+summary(trainBoostData$PerformanceTag)
+table(trainBoostData$PerformanceTag)
+
+### Building Boosting tree Model ###
+gbmfit <-
+  caret::train(PerformanceTag ~ .,
+               data = trainBoostData,
+               method = "gbm",
+               trControl = trainControl(
+                 method = "repeatedcv",
+                 number = 4,
+                 repeats = 4,
+                 verbose = FALSE
+               ),
+               verbose = FALSE)
+
+### predicted probabilities for test data
+
+test_pred = predict(gbmfit, type = "prob",
+                    newdata = testModel[, -1])[, -1]
+# Let's see the summary
+summary(test_pred)
+
+# Let's use the probability cutoff of 5%.
+test_pred <- factor(ifelse(test_pred >= 0.1, "1", "0"))
+test_actual <- factor(testModel$PerformanceTag)
+testModel$PerformanceTag <- test_actual
+test_actual <- factor(test_actual)
+testModel$PerformanceTag <- factor(testModel$PerformanceTag)
+
+test_conf <- confusionMatrix(test_pred, test_actual, positive = "1")
+test_conf
+
+# Finding out the optimal probalility cutoff
+
+perform_fn <- function(cutoff)
+{
+  predicted <- factor(ifelse(test_pred >= cutoff, "1", "0"))
+  conf <- confusionMatrix(predicted, test_actual, positive = "1")
+  acc <- conf$overall[1]
+  sens <- conf$byClass[1]
+  spec <- conf$byClass[2]
+  out <- t(as.matrix(c(sens, spec, acc)))
+  colnames(out) <- c("sensitivity", "specificity", "accuracy")
+  return(out)
+}
+
+# Summary of test probability
+test_pred = predict(gbmfit, type = "prob",
+                    newdata = testModel[, -1])[, -1]
+summary(test_pred)
+s = seq(.01, .14, length = 100)
+OUT = matrix(0, 100, 3)
+for (i in 1:100)
+{
+  OUT[i, ] = perform_fn(s[i])
+}
+
+plot(
+  s,
+  OUT[, 1],
+  xlab = "Cutoff",
+  ylab = "Value",
+  cex.lab = 1.5,
+  cex.axis = 1.5,
+  ylim = c(0, 1),
+  type = "l",
+  lwd = 2,
+  axes = TRUE,
+  col = 2
+)
+axis(1, seq(0, 1, length = 5), seq(0, 1, length = 5), cex.lab = 1.5)
+axis(2, seq(0, 1, length = 5), seq(0, 1, length = 5), cex.lab = 1.5)
+lines(s, OUT[, 2], col = "darkgreen", lwd = 2)
+lines(s, OUT[, 3], col = 4, lwd = 2)
+box()
+legend(
+  0,
+  .50,
+  col = c(2, "darkgreen", 4, "darkred"),
+  lwd = c(2, 2, 2, 2),
+  c("Sensitivity", "Specificity", "Accuracy")
+)
+
+
+cutoff <- s[which.min(abs(OUT[, 1] - OUT[, 2]))]
+cutoff ## 0.04414141
+
+# Let's choose a cutoff value of 0.04414141 for final model
+test_pred = predict(gbmfit, type = "prob",
+                    newdata = testModel[, -1])[, -1]
+test_cutoff <- factor(ifelse(test_pred > 0.049, "1", "0"))
+
+conf_final <-
+  confusionMatrix(test_cutoff, test_actual, positive = "1")
+acc <- conf_final$overall[1]
+sens <- conf_final$byClass[1]
+spec <- conf_final$byClass[2]
+
+acc
+# Accuracy
+# 0.6942894
+sens
+# Sensitivity
+# 0.5033937
+spec
+# Specificity
+# 0.7026946
+
+##### Building a score Card ######
+library(data.table)
+library(scorecard)
+
+# woe binning
+dt_s = var_filter(final_woe, y="PerformanceTag")
+bins = woebin(dt_s, y="PerformanceTag", print_step = 1)
+
+# score
+card = scorecard(bins, model_17, points0 = 400, odds0 = 1/10, pdo = 20)
+# credit score
+scoreCard = scorecard_ply(final_woe, card, print_step=0)
+scoreCard <- cbind(ApplicationIDcredit, scoreCard)
+scoreCard$PerformanceTag <- final_woe$PerformanceTag
+
+View(scoreCard)
+table(scoreCard$score, scoreCard$PerformanceTag)
