@@ -1432,6 +1432,19 @@ model_17 <- glm(formula = PerformanceTag ~ currResidenceTenure_woe +
                   `currResidenceTenure_bucket_Quartile.(10,61]` + `currResidenceTenure_bucket_Quartile.(61,123]` + No_of_times_90_DPD_or_worse_in_last_6_months + No_of_times_30_DPD_or_worse_in_last_6_months, data = train)
 summary(model_17)
 vif(model_17)
+
+#### Important Variables ####
+"currResidenceTenure
+No of times 90DPDorworse in last 12months
+Avgas CCUtilization in last 12 months 
+No of trades opened in last 12months
+`currResidenceTenure_bucket_Quartile.(10,61]`
+`currResidenceTenure_bucket_Quartile.(61,123]`
+No_of_times_90_DPD_or_worse_in_last_6_months
+No_of_times_30_DPD_or_worse_in_last_6_months
+"
+############################
+
 # predicting the results in test dataset
 test$test_predict = predict(model_17, 
                             newdata = test[,-1])
