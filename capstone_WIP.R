@@ -1630,7 +1630,7 @@ cutoff ## 0.04414141
 # Let's choose a cutoff value of 0.04414141 for final model
 test_pred = predict(gbmfit, type = "prob",
                     newdata = testModel[, -1])[, -1]
-test_cutoff <- factor(ifelse(test_pred > 0.049, "1", "0"))
+test_cutoff <- factor(ifelse(test_pred > 0.047, "1", "0"))
 
 conf_final <-
   confusionMatrix(test_cutoff, test_actual, positive = "1")
@@ -1657,7 +1657,7 @@ dt_s = var_filter(final_woe, y="PerformanceTag")
 bins = woebin(dt_s, y="PerformanceTag", print_step = 1)
 
 # score
-card = scorecard(bins, model_17, points0 = 400, odds0 = 1/10, pdo = 20)
+card = scorecard(bins, model_9, points0 = 400, odds0 = 1/10, pdo = 20)
 # credit score
 scoreCard = scorecard_ply(final_woe, card, print_step=0)
 scoreCard <- cbind(ApplicationIDcredit, scoreCard)
@@ -1665,4 +1665,3 @@ scoreCard$PerformanceTag <- final_woe$PerformanceTag
 
 View(scoreCard)
 table(scoreCard$score, scoreCard$PerformanceTag)
-
