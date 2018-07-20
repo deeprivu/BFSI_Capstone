@@ -53,7 +53,7 @@ names(demoData)
 colnames(demoData) <- c("ApplicationID","Age","Gender","MaritalStatus","Dependents","Income","Education","Profession",
                         "TypeofResidence","currResidenceTenure","currJobTenure","PerformanceTag")
 names(demoData) ## Checking on the exisitng columns names
-demoData <- demoData[is.na(demoData$PerformanceTag)==F,]
+demoData[is.na(demoData$PerformanceTag)==T,]$PerformanceTag <- 0
 sapply(demoData, function(x)
   length(which(x == ""))) # checking for blank "" values; there are lots
 sum(duplicated(demoData$ApplicationID)) # 3 duplicates
@@ -167,37 +167,6 @@ demoData[is.na(demoData$Education)==TRUE]$Education <- getmode(demoData$Educatio
 demoData[is.na(demoData$TypeofResidence)==TRUE]$TypeofResidence <- getmode(demoData$TypeofResidence)
 demoData[is.na(demoData$Profession)==TRUE]$Profession <- getmode(demoData$Profession)
 sum(is.na(demoData))
-#### Imputing with woe values ####
-
-## Changing the data type of the variables, and small necessary amendments in the dataset
-str(woe_data)
-woe_data <- woe_data[,-1] ## Application_ID will not be required
-woe_data$Gender <- as.factor(woe_data$Gender)
-woe_data$MaritalStatus <- as.factor(woe_data$MaritalStatus)
-woe_data$Education <- as.factor(woe_data$Education)
-woe_data$Profession <- as.factor(woe_data$Profession)
-woe_data$PerformanceTag <- as.factor(woe_data$PerformanceTag)
-woe_data$TypeofResidence <- as.factor(woe_data$TypeofResidence)
-
-woe_data$Age <- as.integer(woe_data$Age)
-woe_data$Dependents <- as.integer(woe_data$Dependents)
-woe_data$Income <- as.integer(woe_data$Income)
-woe_data$currResidenceTenure <- as.integer(woe_data$currResidenceTenure)
-woe_data$currJobTenure <- as.integer(woe_data$currJobTenure)
-
- woe_data <- as.data.frame(woe_data)
- row.names(woe_data) <- 1:nrow(woe_data)
- outiv <- iv.mult(woe_data,"PerformanceTag")
- woe_test <- iv.replace.woe(woe_data, outiv) ## Imputing with woe values
-
- iv.mult(woe_data,"PerformanceTag")
- colSums(is.na(woe_test))
- colSums(is.na(demoData))
-
-### After imputation, we have 2 datasets: demoData <- Imputation with normal methodologies
-### woe_data <- Imputation with woe_values
-
-
 ### Outlier Treatment ###
 sapply(select_if(demoData, is.numeric), function(x)
   quantile(x, seq(0, 1, 0.01))) ## Function to understand the outliers
@@ -305,12 +274,11 @@ str(creditBureauData)
 dim(creditBureauData) # 71295*19
 sum(is.na(creditBureauData)) ## 3028 nulls in total
 colSums(is.na(select_if(creditBureauData, colSums(is.na(creditBureauData))>0))) ## Column having nulls
-## The predictor Variable PerformanceTag has nulls, removing the records (~2%)
-creditBureauData <- creditBureauData[is.na(creditBureauData$Performance.Tag)==F,]
+## The predictor Variable PerformanceTag has nulls, replacing the records with 0(~2%)
+creditBureauData[is.na(creditBureauData$Performance.Tag)==T,]$Performance.Tag <- 0
 sum(sapply(creditBureauData, function(x)
   length(which(x == "")))) # checking for blank "" values; there are none
 sum(duplicated(creditBureauData$Application.ID)) ## 3 duplicates
-creditBureauData <- creditBureauData[is.na(creditBureauData$Performance.Tag)==F,] ## Removing the recprds where target Variable is absent
 
 ### Quality Issues in the Credit data ###
 "Check, if the Performance.Tag is same in both the data sets, corresponding to the same Application ID"
@@ -448,7 +416,7 @@ cor_matrix = cor(creditBureauData[,-c("Performance_Tag.1")])
 corrplot(cor_matrix, method = "pie", type = "lower", tl.cex = 0.9)
 ## From the plot, we can see that, there exists a strong correlation amongst the variables
 
-############################# Preparing for the final Data ##########################
+############################# Preparing the final Data for Modelling ##########################
 ### Initial Checks ###
 dim(ApplicationIDcredit); dim(ApplicationIDdemo)
 nrow(demoData); nrow(creditBureauData)
@@ -473,7 +441,7 @@ test = demoData[-trainindices,]
 
 ## Logistic Regression ##
 ## Initial Model using all the variables of Demo_Data ##
-model_1 <-glm(PerformanceTag.1~.,data=train)
+model_1 <-glm(PerformanceTag.1~.,family = "binomial", data=train)
 summary(model_1)
 
 ## Running stepAID
@@ -486,7 +454,7 @@ model_2 <- glm(formula = PerformanceTag.1 ~ Income + currResidenceTenure +
                  Profession.SE + `Age_bucket_Quartile.(37,45]` + `Income_bucket_Quartile.(40,61]` + 
                  `currResidenceTenure_bucket_Quartile.(10,61]` + `currResidenceTenure_bucket_Quartile.(61,123]` + 
                  `currJobTenure_bucket_Quartile.(17,34]` + `currJobTenure_bucket_Response.(60,74]`, 
-               data = train)
+               family = "binomial", data = train)
 summary(model_2)
 vif(model_2)
 
@@ -494,7 +462,7 @@ model_3 <- glm(formula = PerformanceTag.1 ~ Income + currResidenceTenure +
                  currJobTenure + iscurrResidenceTenurelessthan8 + iscurrJobTenurelessthan4 + 
                  Profession.SE + `Age_bucket_Quartile.(37,45]` + `Income_bucket_Quartile.(40,61]` + 
                  `currResidenceTenure_bucket_Quartile.(10,61]` + `currJobTenure_bucket_Quartile.(17,34]` + `currJobTenure_bucket_Response.(60,74]`, 
-               data = train)
+               family = "binomial", data = train)
 summary(model_3)
 vif(model_3)
 
@@ -502,38 +470,38 @@ model_4 <- glm(formula = PerformanceTag.1 ~ Income + currResidenceTenure +
                  currJobTenure + iscurrResidenceTenurelessthan8 + iscurrJobTenurelessthan4 + 
                  Profession.SE + `Age_bucket_Quartile.(37,45]` +  
                  `currResidenceTenure_bucket_Quartile.(10,61]` + `currJobTenure_bucket_Quartile.(17,34]` + `currJobTenure_bucket_Response.(60,74]`, 
-               data = train)
+               family = "binomial", data = train)
 summary(model_4)
 vif(model_4)
 
 model_5 <- glm(formula = PerformanceTag.1 ~ Income + currResidenceTenure + 
                  currJobTenure + iscurrResidenceTenurelessthan8 + iscurrJobTenurelessthan4 + 
                  Profession.SE + `Age_bucket_Quartile.(37,45]` + `currJobTenure_bucket_Quartile.(17,34]` + `currJobTenure_bucket_Response.(60,74]`, 
-               data = train)
+               family = "binomial", data = train)
 summary(model_5)
 vif(model_5)
 
 model_6 <- glm(formula = PerformanceTag.1 ~ Income + currResidenceTenure + 
                  currJobTenure + iscurrResidenceTenurelessthan8 + iscurrJobTenurelessthan4 + 
                  Profession.SE + `currJobTenure_bucket_Quartile.(17,34]` + `currJobTenure_bucket_Response.(60,74]`, 
-               data = train)
+               family = "binomial", data = train)
 summary(model_6)
 
 model_7 <- glm(formula = PerformanceTag.1 ~ Income + currResidenceTenure + 
                  currJobTenure + iscurrResidenceTenurelessthan8 + iscurrJobTenurelessthan4 + 
                  `currJobTenure_bucket_Quartile.(17,34]` + `currJobTenure_bucket_Response.(60,74]`, 
-               data = train)
+               family = "binomial", data = train)
 summary(model_7)
 
 model_8 <- glm(formula = PerformanceTag.1 ~ Income + currResidenceTenure + 
                  currJobTenure + iscurrResidenceTenurelessthan8 + iscurrJobTenurelessthan4 + 
-                 `currJobTenure_bucket_Response.(60,74]`, 
+                 `currJobTenure_bucket_Response.(60,74]`, family = "binomial",
                data = train)
 summary(model_8)
 
 model_9 <- glm(formula = PerformanceTag.1 ~ Income + currResidenceTenure + 
                  currJobTenure + iscurrResidenceTenurelessthan8 + `currJobTenure_bucket_Response.(60,74]`, 
-               data = train)
+               family = "binomial", data = train)
 summary(model_9)
 
 final_model_demoData <- model_9
@@ -616,7 +584,7 @@ test = finalData[-trainindices,]
 
 ## Logistic Regression ##
 ## Initial Model using all the variables of Demo_Data ##
-model_1 <-glm(PerformanceTag.1~.,data=train)
+model_1 <-glm(PerformanceTag.1~.,family = "binomial", data=train)
 summary(model_1)
 
 ## Running stepAIC
@@ -637,7 +605,7 @@ model_2 <- glm(formula = PerformanceTag.1 ~ Age + iscurrResidenceTenurelessthan8
                  No_of_PL_trades_opened_in_last_12_months + No_of_Inquiries_in_last_6_months__excluding_home___auto_loans_ + 
                  No_of_Inquiries_in_last_12_months__excluding_home___auto_loans_ + 
                  Total_No_of_Trades + `Outstanding_Balance_Quartile.(2.09e+05,7.74e+05]`, 
-               data = train)
+               family = "binomial",data = train)
 summary(model_2)
 vif(model_2)
 
@@ -653,7 +621,7 @@ model_3 <- glm(formula = PerformanceTag.1 ~ Age +
                  No_of_PL_trades_opened_in_last_12_months + No_of_Inquiries_in_last_6_months__excluding_home___auto_loans_ + 
                  No_of_Inquiries_in_last_12_months__excluding_home___auto_loans_ + 
                  Total_No_of_Trades + `Outstanding_Balance_Quartile.(2.09e+05,7.74e+05]`, 
-               data = train)
+               family = "binomial", data = train)
 summary(model_3)
 vif(model_3)
 
@@ -669,7 +637,7 @@ model_4 <- glm(formula = PerformanceTag.1 ~
                  No_of_PL_trades_opened_in_last_12_months + No_of_Inquiries_in_last_6_months__excluding_home___auto_loans_ + 
                  No_of_Inquiries_in_last_12_months__excluding_home___auto_loans_ + 
                  Total_No_of_Trades + `Outstanding_Balance_Quartile.(2.09e+05,7.74e+05]`, 
-               data = train)
+               family = "binomial", data = train)
 summary(model_4)
 vif(model_4)
 
@@ -683,7 +651,7 @@ model_5 <- glm(formula = PerformanceTag.1 ~
                  No_of_times_30_DPD_or_worse_in_last_6_months + No_of_times_90_DPD_or_worse_in_last_12_months + 
                  Avgas_CC_Utilization_in_last_12_months + No_of_PL_trades_opened_in_last_12_months + No_of_Inquiries_in_last_12_months__excluding_home___auto_loans_ + 
                  Total_No_of_Trades + `Outstanding_Balance_Quartile.(2.09e+05,7.74e+05]`, 
-               data = train)
+               family = "binomial", data = train)
 summary(model_5)
 vif(model_5)
 
@@ -696,7 +664,7 @@ model_6 <- glm(formula = PerformanceTag.1 ~
                  No_of_times_30_DPD_or_worse_in_last_6_months + No_of_times_90_DPD_or_worse_in_last_12_months + 
                  Avgas_CC_Utilization_in_last_12_months + No_of_PL_trades_opened_in_last_12_months + No_of_Inquiries_in_last_12_months__excluding_home___auto_loans_ + 
                  Total_No_of_Trades + `Outstanding_Balance_Quartile.(2.09e+05,7.74e+05]`, 
-               data = train)
+               family = "binomial", data = train)
 summary(model_6)
 vif(model_6)
 
@@ -708,7 +676,7 @@ model_7 <- glm(formula = PerformanceTag.1 ~ Profession.SE + `Age_bucket_Quartile
                  No_of_times_30_DPD_or_worse_in_last_6_months + No_of_times_90_DPD_or_worse_in_last_12_months + 
                  Avgas_CC_Utilization_in_last_12_months + No_of_PL_trades_opened_in_last_12_months + No_of_Inquiries_in_last_12_months__excluding_home___auto_loans_ + 
                  Total_No_of_Trades + `Outstanding_Balance_Quartile.(2.09e+05,7.74e+05]`, 
-               data = train)
+               family = "binomial", data = train)
 summary(model_7)
 
 model_8 <- glm(formula = PerformanceTag.1 ~ `Age_bucket_Quartile.(45,53]` + `Age_bucket_Quartile.(53,66]` + 
@@ -719,7 +687,7 @@ model_8 <- glm(formula = PerformanceTag.1 ~ `Age_bucket_Quartile.(45,53]` + `Age
                  No_of_times_30_DPD_or_worse_in_last_6_months + No_of_times_90_DPD_or_worse_in_last_12_months + 
                  Avgas_CC_Utilization_in_last_12_months + No_of_PL_trades_opened_in_last_12_months + No_of_Inquiries_in_last_12_months__excluding_home___auto_loans_ + 
                  Total_No_of_Trades + `Outstanding_Balance_Quartile.(2.09e+05,7.74e+05]`, 
-               data = train)
+               family = "binomial", data = train)
 summary(model_8)
 
 model_9 <- glm(formula = PerformanceTag.1 ~ `Age_bucket_Quartile.(53,66]` + 
@@ -730,7 +698,7 @@ model_9 <- glm(formula = PerformanceTag.1 ~ `Age_bucket_Quartile.(53,66]` +
                  No_of_times_30_DPD_or_worse_in_last_6_months + No_of_times_90_DPD_or_worse_in_last_12_months + 
                  Avgas_CC_Utilization_in_last_12_months + No_of_PL_trades_opened_in_last_12_months + No_of_Inquiries_in_last_12_months__excluding_home___auto_loans_ + 
                  Total_No_of_Trades + `Outstanding_Balance_Quartile.(2.09e+05,7.74e+05]`, 
-               data = train)
+               family = "binomial", data = train)
 summary(model_9)
 
 model_10 <- glm(formula = PerformanceTag.1 ~ `currResidenceTenure_bucket_Quartile.(10,61]` + `currResidenceTenure_bucket_Quartile.(61,123]` + 
@@ -740,7 +708,7 @@ model_10 <- glm(formula = PerformanceTag.1 ~ `currResidenceTenure_bucket_Quartil
                  No_of_times_30_DPD_or_worse_in_last_6_months + No_of_times_90_DPD_or_worse_in_last_12_months + 
                  Avgas_CC_Utilization_in_last_12_months + No_of_PL_trades_opened_in_last_12_months + No_of_Inquiries_in_last_12_months__excluding_home___auto_loans_ + 
                  Total_No_of_Trades + `Outstanding_Balance_Quartile.(2.09e+05,7.74e+05]`, 
-               data = train)
+                family = "binomial", data = train)
 summary(model_10)
 
 model_11 <- glm(formula = PerformanceTag.1 ~ `currResidenceTenure_bucket_Quartile.(61,123]` + 
@@ -750,7 +718,7 @@ model_11 <- glm(formula = PerformanceTag.1 ~ `currResidenceTenure_bucket_Quartil
                   No_of_times_30_DPD_or_worse_in_last_6_months + No_of_times_90_DPD_or_worse_in_last_12_months + 
                   Avgas_CC_Utilization_in_last_12_months + No_of_PL_trades_opened_in_last_12_months + No_of_Inquiries_in_last_12_months__excluding_home___auto_loans_ + 
                   Total_No_of_Trades + `Outstanding_Balance_Quartile.(2.09e+05,7.74e+05]`, 
-                data = train)
+                family = "binomial", data = train)
 summary(model_11)
 
 model_12 <- glm(formula = PerformanceTag.1 ~ `currResidenceTenure_bucket_Quartile.(61,123]` + 
@@ -759,7 +727,7 @@ model_12 <- glm(formula = PerformanceTag.1 ~ `currResidenceTenure_bucket_Quartil
                   No_of_times_30_DPD_or_worse_in_last_6_months + No_of_times_90_DPD_or_worse_in_last_12_months + 
                   Avgas_CC_Utilization_in_last_12_months + No_of_PL_trades_opened_in_last_12_months + No_of_Inquiries_in_last_12_months__excluding_home___auto_loans_ + 
                   Total_No_of_Trades + `Outstanding_Balance_Quartile.(2.09e+05,7.74e+05]`, 
-                data = train)
+                family = "binomial", data = train)
 summary(model_12)
 vif(model_12)
 
@@ -768,7 +736,7 @@ model_13 <- glm(formula = PerformanceTag.1 ~ `currResidenceTenure_bucket_Quartil
                   No_of_times_30_DPD_or_worse_in_last_6_months + No_of_times_90_DPD_or_worse_in_last_12_months + 
                   Avgas_CC_Utilization_in_last_12_months + No_of_PL_trades_opened_in_last_12_months + No_of_Inquiries_in_last_12_months__excluding_home___auto_loans_ + 
                   Total_No_of_Trades + `Outstanding_Balance_Quartile.(2.09e+05,7.74e+05]`, 
-                data = train)
+                family = "binomial", data = train)
 summary(model_13)
 
 model_14 <- glm(formula = PerformanceTag.1 ~ `currResidenceTenure_bucket_Quartile.(61,123]` + 
@@ -776,7 +744,7 @@ model_14 <- glm(formula = PerformanceTag.1 ~ `currResidenceTenure_bucket_Quartil
                   No_of_times_30_DPD_or_worse_in_last_6_months + No_of_times_90_DPD_or_worse_in_last_12_months + 
                   Avgas_CC_Utilization_in_last_12_months + No_of_PL_trades_opened_in_last_12_months + No_of_Inquiries_in_last_12_months__excluding_home___auto_loans_ + 
                   Total_No_of_Trades + `Outstanding_Balance_Quartile.(2.09e+05,7.74e+05]`, 
-                data = train)
+                family = "binomial", data = train)
 summary(model_14)
 vif(model_14)
 
@@ -785,34 +753,34 @@ model_15 <- glm(formula = PerformanceTag.1 ~ `currResidenceTenure_bucket_Quartil
                   No_of_times_30_DPD_or_worse_in_last_6_months + No_of_times_90_DPD_or_worse_in_last_12_months + 
                   Avgas_CC_Utilization_in_last_12_months + No_of_PL_trades_opened_in_last_12_months + 
                   Total_No_of_Trades + `Outstanding_Balance_Quartile.(2.09e+05,7.74e+05]`, 
-                data = train)
+                family = "binomial", data = train)
 summary(model_15)
 
 model_16 <- glm(formula = PerformanceTag.1 ~ `currJobTenure_bucket_Quartile.(17,34]` + No_of_times_90_DPD_or_worse_in_last_6_months + 
                   No_of_times_30_DPD_or_worse_in_last_6_months + No_of_times_90_DPD_or_worse_in_last_12_months + 
                   Avgas_CC_Utilization_in_last_12_months + No_of_PL_trades_opened_in_last_12_months + 
                   Total_No_of_Trades + `Outstanding_Balance_Quartile.(2.09e+05,7.74e+05]`, 
-                data = train)
+                family = "binomial", data = train)
 summary(model_16)
 
 model_17 <- glm(formula = PerformanceTag.1 ~ No_of_times_90_DPD_or_worse_in_last_6_months + 
                   No_of_times_30_DPD_or_worse_in_last_6_months + No_of_times_90_DPD_or_worse_in_last_12_months + 
                   Avgas_CC_Utilization_in_last_12_months + No_of_PL_trades_opened_in_last_12_months + 
                   Total_No_of_Trades + `Outstanding_Balance_Quartile.(2.09e+05,7.74e+05]`, 
-                data = train)
+                family = "binomial", data = train)
 summary(model_17)
 vif(model_17)
 
 model_18 <- glm(formula = PerformanceTag.1 ~ No_of_times_90_DPD_or_worse_in_last_6_months + 
                   No_of_times_30_DPD_or_worse_in_last_6_months + No_of_times_90_DPD_or_worse_in_last_12_months + 
                   Avgas_CC_Utilization_in_last_12_months + No_of_PL_trades_opened_in_last_12_months + `Outstanding_Balance_Quartile.(2.09e+05,7.74e+05]`, 
-                data = train)
+                family = "binomial", data = train)
 summary(model_18)
 vif(model_18)
 
 model_19 <- glm(formula = PerformanceTag.1 ~ No_of_times_30_DPD_or_worse_in_last_6_months + No_of_times_90_DPD_or_worse_in_last_12_months + 
                   Avgas_CC_Utilization_in_last_12_months + No_of_PL_trades_opened_in_last_12_months + `Outstanding_Balance_Quartile.(2.09e+05,7.74e+05]`, 
-                data = train)
+                family = "binomial", data = train)
 summary(model_19)
 vif(model_19)
 
@@ -1209,227 +1177,6 @@ spec
 # Specificity
 # 0.6125915
 
-######################## Modelling using woe imputed Data (Final Data)  ###################
-### Preparing woe final dataset
-nrow(demoData_woe); nrow(creditBureauData_woe)
-final_woe <- cbind(demoData_woe, creditBureauData_woe)
-final_woe <- final_woe[,-c("ApplicationID","Application.ID","PerformanceTag")]
-colnames(final_woe) <- gsub("\\.","",names(final_woe))
-final_woe <- as.data.frame(final_woe)
-str(final_woe)
-final_woe$Gender <- as.factor(final_woe$Gender)
-final_woe$MaritalStatus <- as.factor(final_woe$MaritalStatus)
-final_woe$Dependents <- as.numeric(final_woe$Dependents)
-final_woe$Education <- as.factor(final_woe$Education)
-final_woe$Profession <- as.factor(final_woe$Profession)
-final_woe$TypeofResidence <- as.factor(final_woe$TypeofResidence)
-
-
-outiv <- iv.mult(final_woe,"PerformanceTag")
-
-## Relacing the woe final dataset with respective woe values
-final_woe <- final_woe[,!(names(final_woe) %in% c("Age","Gender","MaritalStatus","Dependents","Education","Profession",
-                                                  "TypeofResidence","currJobTenure","Presenceofopenhomeloan","Presenceofopenautoloan"))]
-outiv <- iv.mult(final_woe,"PerformanceTag")
-woe_test <- iv.replace.woe(final_woe,iv=outiv)
-final_woe <- woe_test[,18:ncol(woe_test)]
-#final_woe$PerformanceTag <- as.numeric(final_woe$PerformanceTag)
-final_woe$PerformanceTag <- as.numeric(ifelse(final_woe$PerformanceTag==1,1,0))
-final_woeForest <- final_woe
-final_woe <- cbind(final_woe,finalData)
-final_woe <- final_woe[,-19]
-
-### Model Building for final_woe(using Logistic Regression) ###
-set.seed(100)
-trainindices= sample(1:nrow(final_woe), 0.7*nrow(final_woe))
-train = final_woe[trainindices,]
-test = final_woe[-trainindices,]
-
-## Logistic Regression ##
-## Initial Model using all the variables of Demo_Data ##
-model_1 <-glm(PerformanceTag~.,data=train)
-summary(model_1)
-vif(model_1)
-
-## Running stepAIC
-step <- stepAIC(model_1, direction="both")
-summary(step)
-vif(step)
-
-## Further Model Building Processess ###
-model_2 <- glm(formula = PerformanceTag ~ Income_woe + currResidenceTenure_woe + 
-                 Nooftimes90DPDorworseinlast12months_woe + AvgasCCUtilizationinlast12months_woe + 
-                 Nooftradesopenedinlast12months_woe + NoofPLtradesopenedinlast6months_woe + 
-                 NoofInquiriesinlast12monthsexcludinghomeautoloans_woe + OutstandingBalance_woe + 
-                 Age + Gender.M + Profession.SE + `Age_bucket_Quartile.(37,45]` + 
-                 `Age_bucket_Quartile.(45,53]` + `Age_bucket_Quartile.(53,66]` + 
-                 `Income_bucket_Quartile.(27,40]` + `Income_bucket_Quartile.(40,61]` + 
-                 `currResidenceTenure_bucket_Quartile.(10,61]` + `currResidenceTenure_bucket_Quartile.(61,123]` + 
-                 `currJobTenure_bucket_Quartile.(17,34]` + `currJobTenure_bucket_Quartile.(34,51]` + 
-                 `currJobTenure_bucket_Quartile.(51,74]` + `Age_bucket_Response.(36,56]` + 
-                 No_of_times_90_DPD_or_worse_in_last_6_months + No_of_times_30_DPD_or_worse_in_last_6_months + No_of_times_90_DPD_or_worse_in_last_12_months + 
-                 No_of_trades_opened_in_last_12_months + No_of_PL_trades_opened_in_last_6_months + 
-                 No_of_PL_trades_opened_in_last_12_months, data = train)
-summary(model_2)
-vif(model_2)
-
-model_3 <- glm(formula = PerformanceTag ~ Income_woe + currResidenceTenure_woe + 
-                 Nooftimes90DPDorworseinlast12months_woe + AvgasCCUtilizationinlast12months_woe + 
-                 Nooftradesopenedinlast12months_woe + NoofPLtradesopenedinlast6months_woe + 
-                 NoofInquiriesinlast12monthsexcludinghomeautoloans_woe + OutstandingBalance_woe + Gender.M + Profession.SE + Age +
-                 `Income_bucket_Quartile.(27,40]` + `Income_bucket_Quartile.(40,61]` + 
-                 `currResidenceTenure_bucket_Quartile.(10,61]` + `currResidenceTenure_bucket_Quartile.(61,123]` + 
-                 `currJobTenure_bucket_Quartile.(17,34]` + `currJobTenure_bucket_Quartile.(34,51]` + 
-                 `currJobTenure_bucket_Quartile.(51,74]` +  
-                 No_of_times_90_DPD_or_worse_in_last_6_months + No_of_times_30_DPD_or_worse_in_last_6_months + No_of_times_90_DPD_or_worse_in_last_12_months + 
-                 No_of_trades_opened_in_last_12_months + No_of_PL_trades_opened_in_last_6_months + 
-                 No_of_PL_trades_opened_in_last_12_months, data = train)
-summary(model_3)
-vif(model_3)
-
-model_4 <- glm(formula = PerformanceTag ~ Income_woe + currResidenceTenure_woe + 
-                 Nooftimes90DPDorworseinlast12months_woe + AvgasCCUtilizationinlast12months_woe + 
-                 Nooftradesopenedinlast12months_woe + NoofPLtradesopenedinlast6months_woe + 
-                 NoofInquiriesinlast12monthsexcludinghomeautoloans_woe + OutstandingBalance_woe + Gender.M + Profession.SE + Age +
-                 `Income_bucket_Quartile.(27,40]` + `Income_bucket_Quartile.(40,61]` + 
-                 `currResidenceTenure_bucket_Quartile.(10,61]` + `currResidenceTenure_bucket_Quartile.(61,123]` + 
-                 `currJobTenure_bucket_Quartile.(17,34]` + `currJobTenure_bucket_Quartile.(34,51]` + 
-                 `currJobTenure_bucket_Quartile.(51,74]` +  
-                 No_of_times_90_DPD_or_worse_in_last_6_months + No_of_times_30_DPD_or_worse_in_last_6_months + No_of_times_90_DPD_or_worse_in_last_12_months + 
-                 No_of_trades_opened_in_last_12_months + No_of_PL_trades_opened_in_last_6_months, data = train)
-summary(model_4)
-vif(model_4)
-
-model_5 <- glm(formula = PerformanceTag ~ Income_woe + currResidenceTenure_woe + 
-                 Nooftimes90DPDorworseinlast12months_woe + AvgasCCUtilizationinlast12months_woe + 
-                 Nooftradesopenedinlast12months_woe + NoofPLtradesopenedinlast6months_woe + 
-                 NoofInquiriesinlast12monthsexcludinghomeautoloans_woe + OutstandingBalance_woe + Gender.M + Profession.SE + Age +
-                 `Income_bucket_Quartile.(27,40]` + `Income_bucket_Quartile.(40,61]` + 
-                 `currResidenceTenure_bucket_Quartile.(10,61]` + `currResidenceTenure_bucket_Quartile.(61,123]` + 
-                 `currJobTenure_bucket_Quartile.(17,34]` + `currJobTenure_bucket_Quartile.(34,51]` + 
-                 `currJobTenure_bucket_Quartile.(51,74]` +  
-                 No_of_times_90_DPD_or_worse_in_last_6_months + No_of_times_30_DPD_or_worse_in_last_6_months + No_of_times_90_DPD_or_worse_in_last_12_months + No_of_PL_trades_opened_in_last_6_months, data = train)
-summary(model_5)
-vif(model_5)
-
-model_6 <- glm(formula = PerformanceTag ~ Income_woe + currResidenceTenure_woe + 
-                 Nooftimes90DPDorworseinlast12months_woe + AvgasCCUtilizationinlast12months_woe + 
-                 Nooftradesopenedinlast12months_woe + NoofPLtradesopenedinlast6months_woe + 
-                 NoofInquiriesinlast12monthsexcludinghomeautoloans_woe + OutstandingBalance_woe + Profession.SE + Age +
-                 `Income_bucket_Quartile.(27,40]` + `Income_bucket_Quartile.(40,61]` + 
-                 `currResidenceTenure_bucket_Quartile.(10,61]` + `currResidenceTenure_bucket_Quartile.(61,123]` + 
-                 `currJobTenure_bucket_Quartile.(17,34]` + `currJobTenure_bucket_Quartile.(34,51]` + 
-                 `currJobTenure_bucket_Quartile.(51,74]` +  
-                 No_of_times_90_DPD_or_worse_in_last_6_months + No_of_times_30_DPD_or_worse_in_last_6_months + No_of_times_90_DPD_or_worse_in_last_12_months + No_of_PL_trades_opened_in_last_6_months, data = train)
-summary(model_6)
-vif(model_6)
-
-model_7 <- glm(formula = PerformanceTag ~ Income_woe + currResidenceTenure_woe + 
-                 Nooftimes90DPDorworseinlast12months_woe + AvgasCCUtilizationinlast12months_woe + 
-                 Nooftradesopenedinlast12months_woe + NoofPLtradesopenedinlast6months_woe + 
-                 NoofInquiriesinlast12monthsexcludinghomeautoloans_woe + OutstandingBalance_woe + Profession.SE +
-                 `Income_bucket_Quartile.(27,40]` + `Income_bucket_Quartile.(40,61]` + 
-                 `currResidenceTenure_bucket_Quartile.(10,61]` + `currResidenceTenure_bucket_Quartile.(61,123]` + 
-                 `currJobTenure_bucket_Quartile.(17,34]` + `currJobTenure_bucket_Quartile.(34,51]` + 
-                 `currJobTenure_bucket_Quartile.(51,74]` +  
-                 No_of_times_90_DPD_or_worse_in_last_6_months + No_of_times_30_DPD_or_worse_in_last_6_months + No_of_times_90_DPD_or_worse_in_last_12_months + No_of_PL_trades_opened_in_last_6_months, data = train)
-summary(model_7)
-vif(model_7)
-
-model_8 <- glm(formula = PerformanceTag ~ Income_woe + currResidenceTenure_woe + 
-                 Nooftimes90DPDorworseinlast12months_woe + AvgasCCUtilizationinlast12months_woe + 
-                 Nooftradesopenedinlast12months_woe + NoofPLtradesopenedinlast6months_woe + 
-                 NoofInquiriesinlast12monthsexcludinghomeautoloans_woe + OutstandingBalance_woe +
-                 `Income_bucket_Quartile.(27,40]` + `Income_bucket_Quartile.(40,61]` + 
-                 `currResidenceTenure_bucket_Quartile.(10,61]` + `currResidenceTenure_bucket_Quartile.(61,123]` + 
-                 `currJobTenure_bucket_Quartile.(17,34]` + `currJobTenure_bucket_Quartile.(34,51]` + 
-                 `currJobTenure_bucket_Quartile.(51,74]` +  
-                 No_of_times_90_DPD_or_worse_in_last_6_months + No_of_times_30_DPD_or_worse_in_last_6_months + No_of_times_90_DPD_or_worse_in_last_12_months + No_of_PL_trades_opened_in_last_6_months, data = train)
-summary(model_8)
-vif(model_8)
-
-model_9 <- glm(formula = PerformanceTag ~ Income_woe + currResidenceTenure_woe + 
-                 Nooftimes90DPDorworseinlast12months_woe + AvgasCCUtilizationinlast12months_woe + 
-                 Nooftradesopenedinlast12months_woe + NoofPLtradesopenedinlast6months_woe + 
-                 NoofInquiriesinlast12monthsexcludinghomeautoloans_woe + OutstandingBalance_woe +
-                 `Income_bucket_Quartile.(27,40]` + `Income_bucket_Quartile.(40,61]` + 
-                 `currResidenceTenure_bucket_Quartile.(10,61]` + `currResidenceTenure_bucket_Quartile.(61,123]` + 
-                 `currJobTenure_bucket_Quartile.(17,34]` + 
-                 `currJobTenure_bucket_Quartile.(51,74]` +  
-                 No_of_times_90_DPD_or_worse_in_last_6_months + No_of_times_30_DPD_or_worse_in_last_6_months + No_of_times_90_DPD_or_worse_in_last_12_months + No_of_PL_trades_opened_in_last_6_months, data = train)
-summary(model_9)
-vif(model_9)
-
-model_10 <- glm(formula = PerformanceTag ~ Income_woe + currResidenceTenure_woe + 
-                 Nooftimes90DPDorworseinlast12months_woe + AvgasCCUtilizationinlast12months_woe + 
-                 Nooftradesopenedinlast12months_woe + NoofPLtradesopenedinlast6months_woe + OutstandingBalance_woe +
-                 `Income_bucket_Quartile.(27,40]` + `Income_bucket_Quartile.(40,61]` + 
-                 `currResidenceTenure_bucket_Quartile.(10,61]` + `currResidenceTenure_bucket_Quartile.(61,123]` + 
-                 `currJobTenure_bucket_Quartile.(17,34]` + 
-                 `currJobTenure_bucket_Quartile.(51,74]` +  
-                 No_of_times_90_DPD_or_worse_in_last_6_months + No_of_times_30_DPD_or_worse_in_last_6_months + No_of_times_90_DPD_or_worse_in_last_12_months + No_of_PL_trades_opened_in_last_6_months, data = train)
-summary(model_10)
-vif(model_10)
-
-model_11 <- glm(formula = PerformanceTag ~ Income_woe + currResidenceTenure_woe + 
-                  Nooftimes90DPDorworseinlast12months_woe + AvgasCCUtilizationinlast12months_woe + 
-                  Nooftradesopenedinlast12months_woe + NoofPLtradesopenedinlast6months_woe + OutstandingBalance_woe +
-                  `Income_bucket_Quartile.(27,40]` + `Income_bucket_Quartile.(40,61]` + 
-                  `currResidenceTenure_bucket_Quartile.(10,61]` + `currResidenceTenure_bucket_Quartile.(61,123]` + 
-                  `currJobTenure_bucket_Quartile.(17,34]` + 
-                  `currJobTenure_bucket_Quartile.(51,74]` +  
-                  No_of_times_90_DPD_or_worse_in_last_6_months + No_of_times_30_DPD_or_worse_in_last_6_months + No_of_PL_trades_opened_in_last_6_months, data = train)
-summary(model_11)
-vif(model_11)
-
-model_12 <- glm(formula = PerformanceTag ~ Income_woe + currResidenceTenure_woe + 
-                  Nooftimes90DPDorworseinlast12months_woe + AvgasCCUtilizationinlast12months_woe + 
-                  Nooftradesopenedinlast12months_woe + NoofPLtradesopenedinlast6months_woe + OutstandingBalance_woe +
-                  `Income_bucket_Quartile.(27,40]` + `Income_bucket_Quartile.(40,61]` + 
-                  `currResidenceTenure_bucket_Quartile.(10,61]` + `currResidenceTenure_bucket_Quartile.(61,123]` + 
-                  `currJobTenure_bucket_Quartile.(17,34]` + No_of_times_90_DPD_or_worse_in_last_6_months + No_of_times_30_DPD_or_worse_in_last_6_months + No_of_PL_trades_opened_in_last_6_months, data = train)
-summary(model_12)
-vif(model_12)
-
-model_13 <- glm(formula = PerformanceTag ~ Income_woe + currResidenceTenure_woe + 
-                  Nooftimes90DPDorworseinlast12months_woe + AvgasCCUtilizationinlast12months_woe + 
-                  Nooftradesopenedinlast12months_woe + OutstandingBalance_woe +
-                  `Income_bucket_Quartile.(27,40]` + `Income_bucket_Quartile.(40,61]` + 
-                  `currResidenceTenure_bucket_Quartile.(10,61]` + `currResidenceTenure_bucket_Quartile.(61,123]` + 
-                  `currJobTenure_bucket_Quartile.(17,34]` + No_of_times_90_DPD_or_worse_in_last_6_months + No_of_times_30_DPD_or_worse_in_last_6_months + No_of_PL_trades_opened_in_last_6_months, data = train)
-summary(model_13)
-vif(model_13)
-
-model_14 <- glm(formula = PerformanceTag ~ Income_woe + currResidenceTenure_woe + 
-                  Nooftimes90DPDorworseinlast12months_woe + AvgasCCUtilizationinlast12months_woe + 
-                  Nooftradesopenedinlast12months_woe + `Income_bucket_Quartile.(27,40]` + `Income_bucket_Quartile.(40,61]` + 
-                  `currResidenceTenure_bucket_Quartile.(10,61]` + `currResidenceTenure_bucket_Quartile.(61,123]` + 
-                  `currJobTenure_bucket_Quartile.(17,34]` + No_of_times_90_DPD_or_worse_in_last_6_months + No_of_times_30_DPD_or_worse_in_last_6_months + No_of_PL_trades_opened_in_last_6_months, data = train)
-summary(model_14)
-vif(model_14)
-
-model_15 <- glm(formula = PerformanceTag ~ Income_woe + currResidenceTenure_woe + 
-                  Nooftimes90DPDorworseinlast12months_woe + AvgasCCUtilizationinlast12months_woe + 
-                  Nooftradesopenedinlast12months_woe + `Income_bucket_Quartile.(27,40]` + `Income_bucket_Quartile.(40,61]` + 
-                  `currResidenceTenure_bucket_Quartile.(10,61]` + `currResidenceTenure_bucket_Quartile.(61,123]` + 
-                  `currJobTenure_bucket_Quartile.(17,34]` + No_of_times_90_DPD_or_worse_in_last_6_months + No_of_times_30_DPD_or_worse_in_last_6_months, data = train)
-summary(model_15)
-vif(model_15)
-
-model_16 <- glm(formula = PerformanceTag ~ currResidenceTenure_woe + 
-                  Nooftimes90DPDorworseinlast12months_woe + AvgasCCUtilizationinlast12months_woe + 
-                  Nooftradesopenedinlast12months_woe +  
-                  `currResidenceTenure_bucket_Quartile.(10,61]` + `currResidenceTenure_bucket_Quartile.(61,123]` + 
-                  `currJobTenure_bucket_Quartile.(17,34]` + No_of_times_90_DPD_or_worse_in_last_6_months + No_of_times_30_DPD_or_worse_in_last_6_months, data = train)
-summary(model_16)
-vif(model_16)
-
-model_17 <- glm(formula = PerformanceTag ~ currResidenceTenure_woe + 
-                  Nooftimes90DPDorworseinlast12months_woe + AvgasCCUtilizationinlast12months_woe + 
-                  Nooftradesopenedinlast12months_woe +  
-                  `currResidenceTenure_bucket_Quartile.(10,61]` + `currResidenceTenure_bucket_Quartile.(61,123]` + No_of_times_90_DPD_or_worse_in_last_6_months + No_of_times_30_DPD_or_worse_in_last_6_months, data = train)
-summary(model_17)
-vif(model_17)
 
 #### Important Variables ####
 "currResidenceTenure
@@ -1514,22 +1261,127 @@ spec
 # Specificity 
 # 0.6567216 
 
-######### Modelling using xgboost #########
-set.seed(123)
-split_indices <- sample.split(final_woe$PerformanceTag, SplitRatio = 0.7)
-trainModel <- final_woe[split_indices,]
-testModel <- final_woe[!split_indices,]
+##### Model Building(Logistic regression) using woe values and Building a score Card ######
+library(data.table)
+library(scorecard)
 
-### Random Forests, can be used, in here, but takes lot of time, so, we will use Gradient Boosting,
-### which produces same results, but faster
+## woe binning of the Demographic Data ##
+dt <- setDT(demoData_woe[,-1])
+dt_s = var_filter(dt, y="PerformanceTag")
+bins = woebin(dt, y="PerformanceTag", print_step = 1)
+dt_list = split_df(dt_s, y="PerformanceTag", ratio = 0.7, seed = 30)
+train = dt_list$train; test = dt_list$test;
+train_woe = woebin_ply(train, bins, print_step=0)
+test_woe = woebin_ply(test, bins, print_step=0)
+train_woe$PerformanceTag <- as.numeric(train_woe$PerformanceTag)
+test_woe$PerformanceTag <- as.numeric(test_woe$PerformanceTag)
+m1Demo = glm(PerformanceTag ~ ., data = train_woe)
+m1stepDemo <- stepAIC(m1Demo, direction="both")
+summary(m1stepDemo)
+vif(m1stepDemo)
+
+### Performance Metrics ####
+# predicting the results in test dataset
+test$test_predict = predict(m1stepDemo, 
+                            newdata = test_woe[,-1])
+
+# Let's see the summary 
+summary(test$test_predict)
+
+## Taking the cutoff of 0.04464646
+test_cutoff <- factor(ifelse(test$test_predict >=0.04464646, "1", "0"))
+
+conf_final <- confusionMatrix(test_cutoff, test_actual, positive = "1")
+acc <- conf_final$overall[1]
+sens <- conf_final$byClass[1]
+spec <- conf_final$byClass[2]
+
+acc
+# Accuracy 
+# 0.6023004
+sens
+# Sensitivity 
+# 0.5622172 
+spec
+# Specificity 
+# 0.6040285 
+
+
+## woe binning of the final Data set (Demographic + Credit) ##
+final_woe <- cbind(creditBureauData_woe[,-c(1,19)], demoData_woe[,-1])
+dt = setDT(final_woe)
+dt_s = var_filter(dt, y="PerformanceTag")
+bins = woebin(dt, y="PerformanceTag", print_step = 1)
+
+dt_list = split_df(dt_s, y="PerformanceTag", ratio = 0.7, seed = 30)
+train = dt_list$train; test = dt_list$test;
+train_woe = woebin_ply(train, bins, print_step=0)
+test_woe = woebin_ply(test, bins, print_step=0)
+train_woe$PerformanceTag <- as.numeric(train_woe$PerformanceTag)
+test_woe$PerformanceTag <- as.numeric(test_woe$PerformanceTag)
+
+m1 = glm(PerformanceTag ~ ., family = "binomial", data = train_woe)
+m1step <- stepAIC(m1, direction="both")
+summary(m1step)
+vif(m1step)
+### Performance Metrics ####
+# predicting the results in test dataset
+test$test_predict = predict(m1step, 
+                            newdata = test_woe[,-1], type = "response")
+
+# Let's see the summary 
+summary(test$test_predict)
+
+## Taking the cutoff of 0.04464646
+test_cutoff <- factor(ifelse(test$test_predict >= 0.054,"1", "0"))
+test_actual <- factor(test_woe$PerformanceTag)
+
+conf_final <- confusionMatrix(test_cutoff, test_actual, positive = "1")
+acc <- conf_final$overall[1]
+sens <- conf_final$byClass[1]
+spec <- conf_final$byClass[2]
+
+acc
+# Accuracy 
+# 0.6965588
+sens
+# Sensitivity 
+# 0.5622172 
+spec
+# Specificity 
+# 0.7023508 
+
+### Score Card ###
+m2 = eval(m1step$call)
+
+# score
+card = scorecard(bins, m2, points0 = 400, odds0 = 1/10, pdo = 20)
+# credit score
+scoreCard = scorecard_ply(dt_s, card, print_step=0)
+scoreCard <- cbind(demoData_woe[,1], scoreCard)
+
+final_woe_data = woebin_ply(final_woe, bins, print_step=0)
+scoreCard$PerformanceTag <- predict(m1step, newdata = final_woe_data[,-1], type = "response")
+#test_cutoff <- scoreCard$PerformanceTag
+scoreCard$PerformanceTag <- factor(ifelse(as.numeric(scoreCard$PerformanceTag) >= 0.054,"1", "0"))
+test_cutoff <- ifelse(test_cutoff>= 0.054,1,0)
+
+View(scoreCard)
+table(scoreCard$score, scoreCard$PerformanceTag)
+write.csv(scoreCard, "scoreCard.csv", row.names = FALSE)
+summary(scoreCard[scoreCard$PerformanceTag==1,]$score)
+summary(scoreCard[scoreCard$PerformanceTag==0,]$score)
+
+
+### Building a xgboost model using woe imputed datasets ###
 library(unbalanced)
-trainModel <- as.data.frame(trainModel)
-trainModel$PerformanceTag <- as.factor(trainModel$PerformanceTag)
+train_woe <- as.data.frame(train_woe)
+train_woe$PerformanceTag <- as.factor(train_woe$PerformanceTag)
 set.seed(132)
 dataSMOTE <-
   ubBalance(
-    X = trainModel[, -1],
-    Y = trainModel[, 1],
+    X = train_woe[, -1],
+    Y = train_woe[, 1],
     type = "ubSMOTE",
     percOver = 900,
     percUnder = 600,
@@ -1545,8 +1397,8 @@ table(trainBoostData$PerformanceTag)
 ### Building Boosting tree Model ###
 gbmfit <-
   caret::train(PerformanceTag ~ .,
-               data = trainBoostData,
-               method = "gbm",
+               data = train_woe,
+               method = "xgbTree",
                trControl = trainControl(
                  method = "repeatedcv",
                  number = 4,
@@ -1558,80 +1410,12 @@ gbmfit <-
 ### predicted probabilities for test data
 
 test_pred = predict(gbmfit, type = "prob",
-                    newdata = testModel[, -1])[, -1]
+                    newdata = test_woe[, -1])[,2]
 # Let's see the summary
 summary(test_pred)
 
-# Let's use the probability cutoff of 5%.
-test_pred <- factor(ifelse(test_pred >= 0.1, "1", "0"))
-test_actual <- factor(testModel$PerformanceTag)
-testModel$PerformanceTag <- test_actual
-test_actual <- factor(test_actual)
-testModel$PerformanceTag <- factor(testModel$PerformanceTag)
-
-test_conf <- confusionMatrix(test_pred, test_actual, positive = "1")
-test_conf
-
-# Finding out the optimal probalility cutoff
-
-perform_fn <- function(cutoff)
-{
-  predicted <- factor(ifelse(test_pred >= cutoff, "1", "0"))
-  conf <- confusionMatrix(predicted, test_actual, positive = "1")
-  acc <- conf$overall[1]
-  sens <- conf$byClass[1]
-  spec <- conf$byClass[2]
-  out <- t(as.matrix(c(sens, spec, acc)))
-  colnames(out) <- c("sensitivity", "specificity", "accuracy")
-  return(out)
-}
-
-# Summary of test probability
-test_pred = predict(gbmfit, type = "prob",
-                    newdata = testModel[, -1])[, -1]
-summary(test_pred)
-s = seq(.01, .14, length = 100)
-OUT = matrix(0, 100, 3)
-for (i in 1:100)
-{
-  OUT[i, ] = perform_fn(s[i])
-}
-
-plot(
-  s,
-  OUT[, 1],
-  xlab = "Cutoff",
-  ylab = "Value",
-  cex.lab = 1.5,
-  cex.axis = 1.5,
-  ylim = c(0, 1),
-  type = "l",
-  lwd = 2,
-  axes = TRUE,
-  col = 2
-)
-axis(1, seq(0, 1, length = 5), seq(0, 1, length = 5), cex.lab = 1.5)
-axis(2, seq(0, 1, length = 5), seq(0, 1, length = 5), cex.lab = 1.5)
-lines(s, OUT[, 2], col = "darkgreen", lwd = 2)
-lines(s, OUT[, 3], col = 4, lwd = 2)
-box()
-legend(
-  0,
-  .50,
-  col = c(2, "darkgreen", 4, "darkred"),
-  lwd = c(2, 2, 2, 2),
-  c("Sensitivity", "Specificity", "Accuracy")
-)
-
-
-cutoff <- s[which.min(abs(OUT[, 1] - OUT[, 2]))]
-cutoff ## 0.04414141
-
-# Let's choose a cutoff value of 0.04414141 for final model
-test_pred = predict(gbmfit, type = "prob",
-                    newdata = testModel[, -1])[, -1]
-test_cutoff <- factor(ifelse(test_pred > 0.047, "1", "0"))
-
+test_cutoff <- factor(ifelse(test_pred > 0.052, "1", "0"))
+test_actual <- factor(test_woe$PerformanceTag)
 conf_final <-
   confusionMatrix(test_cutoff, test_actual, positive = "1")
 acc <- conf_final$overall[1]
@@ -1640,28 +1424,135 @@ spec <- conf_final$byClass[2]
 
 acc
 # Accuracy
-# 0.6942894
+# 0.6807556
 sens
 # Sensitivity
-# 0.5033937
+# 0.5769231
 spec
 # Specificity
-# 0.7026946
+# 0.6852321
 
-##### Building a score Card ######
-library(data.table)
-library(scorecard)
+#### Since, the use of xgboost hasn`t provided us any significant advantage over logistic regression,
+#### Hence, we have choosen Logistic Regression based model as the final one
 
-# woe binning
-dt_s = var_filter(final_woe, y="PerformanceTag")
-bins = woebin(dt_s, y="PerformanceTag", print_step = 1)
+#test_actual <- ifelse(demoData$PerformanceTag == "1", 1, 0)
+test$test_predict = predict(m1step, 
+                            newdata = test_woe[,-1], type = "response")
 
-# score
-card = scorecard(bins, model_9, points0 = 400, odds0 = 1/10, pdo = 20)
-# credit score
-scoreCard = scorecard_ply(final_woe, card, print_step=0)
-scoreCard <- cbind(ApplicationIDcredit, scoreCard)
-scoreCard$PerformanceTag <- final_woe$PerformanceTag
+# Let's see the summary 
+summary(test$test_predict)
 
-View(scoreCard)
-table(scoreCard$score, scoreCard$PerformanceTag)
+## Taking the cutoff of 0.054
+test_cutoff <- factor(ifelse(test$test_predict >= 0.054,"1", "0"))
+test_actual <- factor(test_woe$PerformanceTag)
+test_cutoff <- ifelse(test_cutoff == "1", 1, 0)
+test_actual <- ifelse(test_actual == "1", 1, 0)
+
+
+# on testing  data
+pred_object_test <- prediction(test_cutoff, test_actual)
+performance_measures_test <-
+  ROCR::performance(pred_object_test, "tpr", "fpr")
+ks_table_test <- attr(performance_measures_test, "y.values")[[1]] -
+  (attr(performance_measures_test, "x.values")[[1]])
+plot(performance_measures_test,
+     main = "ROC curve",
+     colorize = T)
+
+max(ks_table_test) # 0.264568
+
+# Lift & Gain Chart
+
+lift <- function(labels , predicted_prob, groups = 10) {
+  if (is.factor(labels))
+    labels  <- as.integer(as.character(labels))
+  if (is.factor(predicted_prob))
+    predicted_prob <- as.integer(as.character(predicted_prob))
+  helper = data.frame(cbind(labels , predicted_prob))
+  helper[, "bucket"] = ntile(-helper[, "predicted_prob"], groups)
+  gaintable = helper %>% group_by(bucket)  %>%
+    summarise_at(vars(labels), funs(total = n(),
+                                    totalresp = sum(., na.rm = TRUE))) %>%
+    
+    mutate(
+      Cumresp = cumsum(totalresp),
+      Gain = Cumresp / sum(totalresp) * 100,
+      Cumlift = Gain / (bucket * (100 / groups))
+    )
+  return(gaintable)
+}
+
+Attrition_decile = lift(test_actual, test_pred, groups = 10)
+Attrition_decile
+
+Gain <- c(0, Attrition_decile$Gain)
+Deciles <- c(0, Attrition_decile$bucket)
+plot(
+  y = Gain,
+  x = Deciles,
+  type = "l",
+  lwd = 2,
+  xlab = "Bucket",
+  ylab = "Gain",
+  main = "Gain Chart"
+)
+
+Random_Gain <- seq(from = 0, to = 100, by = 10)
+lines(
+  y = Random_Gain,
+  x = Deciles,
+  type = "l",
+  lwd = 2,
+  col = "red"
+)
+
+Perfect_Gain <- vector(mode = "numeric", length = 11)
+for (i in 2:11) {
+  Perfect_Gain[i] <- 100 * min(1, 129 * (i - 1) / 209)
+}
+lines(
+  y = Perfect_Gain,
+  x = Deciles,
+  type = "l",
+  lwd = 2,
+  col = "darkgreen"
+)
+
+legend(
+  "bottomright",
+  col = c("darkgreen", "black", "red"),
+  lwd = c(2, 2, 2, 2),
+  c("Perfect Model", "Actual Model", "Random Model"),
+  cex = 0.7
+)
+
+# plotting the lift chart
+Lift <- Gain / Random_Gain
+Random_Lift <- Random_Gain / Random_Gain
+
+plot(
+  y = Lift,
+  x = Deciles,
+  type = "l",
+  ylim = c(0, 3.5),
+  lwd = 2,
+  xlab = "Bucket",
+  ylab = "Lift",
+  main = "Lift Chart",
+  ylim <- c()
+)
+lines(
+  y = Random_Lift,
+  x = Deciles,
+  type = "l",
+  lwd = 2,
+  col = "red"
+)
+
+legend(
+  "topright",
+  col = c("black", "red"),
+  lwd = c(2, 2, 2),
+  c("Actual Model", "Random Model"),
+  cex = 0.7
+)
