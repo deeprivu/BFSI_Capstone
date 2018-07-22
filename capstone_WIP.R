@@ -33,10 +33,8 @@ demoData <- read.csv("Demographic data.csv", stringsAsFactors = F)
 
 ########## Data Quality Issues ###########
 "There are 3 duplicates for Application ID, both in credit and Demographic data (same IDs).
-There are 1425 istances, where Performance Tag is not available, so, shall we remove them.
-Missing Value Imputation Strategy (While not using woe values)
-
-Correlation Matrix and Plots need to be changed, its clumpsy now 
+There are 1425 istances, where Performance Tag is not available. These records correspond to rejecting the 
+application itself without going into the loan
 "
 ##########################################
 
@@ -244,9 +242,9 @@ demoData = cbind(demoData, demoData_numeric_norm)
 
 ## Looking into the correlation amongst the variables
 cor_matrix = cor(demoData[,-c("PerformanceTag.1")])
-corrplot(cor_matrix, method = "pie", type = "lower", tl.cex = 0.9)
+#corrplot(cor_matrix, method = "pie", type = "lower", tl.cex = 0.9)
 
-##########################3####3 Data Understanding (For Credit Data) ###################################3
+############################## Data Understanding (For Credit Data) ###################################3
 ### Credit Card Data ###
 # Application ID:	Customer application ID
 # No of times 90 DPD or worse in last 6 months:	Number of times customer has not payed dues since 90days in last 6 months
@@ -413,7 +411,7 @@ creditBureauData = cbind(creditBureauData, creditBureauData_numeric_norm)
 
 ## Looking into the correlation amongst the variables
 cor_matrix = cor(creditBureauData[,-c("Performance_Tag.1")])
-corrplot(cor_matrix, method = "pie", type = "lower", tl.cex = 0.9)
+#corrplot(cor_matrix, method = "pie", type = "lower", tl.cex = 0.9)
 ## From the plot, we can see that, there exists a strong correlation amongst the variables
 
 ############################# Preparing the final Data for Modelling ##########################
@@ -429,7 +427,7 @@ str(finalData)
 setdiff(finalData$Performance_Tag.1, finalData$PerformanceTag.1) ## No Difference :)
 finalData <- finalData[,-c("Performance_Tag.1","Application_ID")]
 cor_matrix = cor(finalData[,-c("PerformanceTag.1")])
-corrplot(cor_matrix, method = "pie", type = "lower", tl.cex = 0.9) ## Correlation in the Final Data Set
+#corrplot(cor_matrix, method = "pie", type = "lower", tl.cex = 0.9) ## Correlation in the Final Data Set
 
 
 ############################### Model Building Phase for Demo Data (using Logistic Regression) ########################
@@ -559,7 +557,7 @@ cutoff <- s[which.min(abs(OUT[, 1] - OUT[, 2]))]
 cutoff 
 # Let's choose a cutoff value of 0.04464646 for final model
 
-test_cutoff <- factor(ifelse(test$test_predict >=0.04464646, "1", "0"))
+test_cutoff <- factor(ifelse(test$test_predict >= 0.04464646, "1", "0"))
 
 conf_final <- confusionMatrix(test_cutoff, test_actual, positive = "1")
 acc <- conf_final$overall[1]
@@ -919,14 +917,14 @@ fitcontrol <-
     verbose = TRUE
   )
 
-pb <- tkProgressBar(title = "progress bar", min = 0, max = 10, width = 300)
-
-for(i in 1:total){
-  Sys.sleep(0.1)
-  setTkProgressBar(pb, i, label=paste( round(i/10*100, 0),
-                                       "% done"))
-}
-close(pb)
+# pb <- tkProgressBar(title = "progress bar", min = 0, max = 10, width = 300)
+# 
+# for(i in 1:total){
+#   Sys.sleep(0.1)
+#   setTkProgressBar(pb, i, label=paste( round(i/10*100, 0),
+#                                        "% done"))
+# }
+# close(pb)
 
 gbmfit <-
   caret::train(PerformanceTag.1 ~ .,
@@ -1005,9 +1003,9 @@ legend(
 
 
 cutoff <- s[which.min(abs(OUT[, 1] - OUT[, 2]))]
-cutoff ## 0.05727273
+cutoff ## 0.0559596
 
-# Let's choose a cutoff value of 0.05727273 for final model
+# Let's choose a cutoff value of 0.0559596 for final model
 test_pred = predict(gbmfit, type = "prob",
                     newdata = testModel[, -1])[, -1]
 test_cutoff <- factor(ifelse(test_pred > cutoff, "1", "0"))
@@ -1020,13 +1018,13 @@ spec <- conf_final$byClass[2]
 
 acc
 # Accuracy
-# 0.5678641
+# 0.5508229
 sens
 # Sensitivity
-# 0.5373303
+# 0.5395928
 spec
 # Specificity
-# 0.5692085
+# 0.5513071
 
 ################## Model Building for the final Data (using xgboost) #################
 ### Initial Quality Checks ###
@@ -1169,13 +1167,13 @@ spec <- conf_final$byClass[2]
 
 acc
 # Accuracy
-# 0.6121368
+# 0.6054797
 sens
 # Sensitivity
-# 0.60181
+# 0.5780543
 spec
 # Specificity
-# 0.6125915
+# 0.6066621
 
 
 #### Important Variables ####
@@ -1242,7 +1240,7 @@ legend(0,.50,col=c(2,"lightgreen",4,"darkred"),lwd=c(2,2,2,2),c("Sensitivity","S
 
 cutoff <- s[which.min(abs(OUT[, 1] - OUT[, 2]))]
 cutoff 
-# Let's choose a cutoff value of 0.04959596 for final model
+# Let's choose a cutoff value of 0.05 for final model
 
 test_cutoff <- factor(ifelse(test$test_predict >= 0.05, "1", "0"))
 
@@ -1253,13 +1251,13 @@ spec <- conf_final$byClass[2]
 
 acc
 # Accuracy 
-# 0.6542627
+# 0.6596222
 sens
 # Sensitivity 
-# 0.5984163 
+# 0.6255656 
 spec
 # Specificity 
-# 0.6567216 
+# 0.6610905 
 
 ##### Model Building(Logistic regression) using woe values and Building a score Card ######
 library(data.table)
@@ -1424,13 +1422,13 @@ spec <- conf_final$byClass[2]
 
 acc
 # Accuracy
-# 0.6807556
+# 0.6721994
 sens
 # Sensitivity
-# 0.5769231
+# 0.5995475
 spec
 # Specificity
-# 0.6852321
+# 0.6753316
 
 #### Since, the use of xgboost hasn`t provided us any significant advantage over logistic regression,
 #### Hence, we have choosen Logistic Regression based model as the final one
@@ -1482,11 +1480,11 @@ lift <- function(labels , predicted_prob, groups = 10) {
   return(gaintable)
 }
 
-Attrition_decile = lift(test_actual, test_pred, groups = 10)
-Attrition_decile
+Performance_decile = lift(test_actual, test_pred, groups = 10)
+Performance_decile
 
-Gain <- c(0, Attrition_decile$Gain)
-Deciles <- c(0, Attrition_decile$bucket)
+Gain <- c(0, Performance_decile$Gain)
+Deciles <- c(0, Performance_decile$bucket)
 plot(
   y = Gain,
   x = Deciles,
@@ -1556,3 +1554,29 @@ legend(
   c("Actual Model", "Random Model"),
   cex = 0.7
 )
+
+### Financial Benefit Assessment ####
+## The following assumptions have been made while assessing the financial model ##
+" The cost of acquisition for every customer has been considered same
+  The expected business/revenue/profit for every customer has been considered same
+  The figures (acquisition cost/reveue per person) are taken for representational purpose. Actual
+  values may vary.
+"
+
+## Following Observations have been made wrt to the model ##
+" We can able to capture ~70% targeted customers by 5th decile
+  Assuming that acquisition cost for each customer is ₹30 and revenue per customer is ₹1000.
+  Here are the stats:
+  
+    Without Model:
+  Upto 5th decile, cost of acquisition of Customers = 2139*5*30 = ₹320850
+  With this, 50% targeted group were approved. Hence, total revenue = 884*0.5*1000 = ₹442000
+  Total Profit = ₹121150
+
+    With the model:
+  70% of targeted group were approved. Hence, total revenue = 884*0.7*1000 = ₹618800
+  Total Profit = ₹297950
+  
+  Hence, improvement in Revenue = ((297950-121150)/121150)*100 = 146%
+  
+"
